@@ -21,6 +21,20 @@ _migraphx_model_locks: dict[str, Lock] = {}
 _migraphx_compiled_inputs: set[tuple[str, MigraphxInputSignature]] = set()
 
 
+_cann_registry_lock = Lock()
+_cann_model_locks: dict[str, Lock] = {}
+
+
+def _cann_get_model_lock(model_key: str) -> Lock:
+    """One inference lock per model file; see the CANN branch in `run`."""
+    with _cann_registry_lock:
+        lock = _cann_model_locks.get(model_key)
+        if lock is None:
+            lock = Lock()
+            _cann_model_locks[model_key] = lock
+        return lock
+
+
 def _migraphx_get_model_lock(model_key: str) -> Lock:
     with _migraphx_registry_lock:
         lock = _migraphx_model_locks.get(model_key)
@@ -97,6 +111,14 @@ class OrtSession:
             outputs = self.session.run(output_names, input_feed, run_options)
             return outputs
 
+        if "CANNExecutionProvider" in self.providers:
+            # Concurrent runs on one CANN session corrupt the device stream: measured 3 of 8 parallel
+            # requests failing with aclrtMemcpyAsync errors, and others returning different face counts
+            # (3 vs 10). Serialising inference keeps results correct while still allowing the caller's
+            # CPU preprocessing to overlap with another request's device work.
+            with _cann_get_model_lock(self.model_path.resolve().as_posix()):
+                return self.session.run(output_names, input_feed, run_options)
+
         outputs = self.session.run(output_names, input_feed, run_options)
         return outputs
 
@@ -157,6 +179,10 @@ class OrtSession:
                         "precision": settings.openvino_precision.value,
                         "cache_dir": (self.model_path.parent / "openvino").as_posix(),
                     }
+                case "CANNExecutionProvider":
+                    # The CANN provider only accepts a numeric device id; passing the string form makes
+                    # device-to-host copies fail at run time (aclrtMemcpyAsync, 507001).
+                    options = {"device_id": int(settings.device_id)}
                 case "CoreMLExecutionProvider":
                     options = {
                         "ModelFormat": "MLProgram",

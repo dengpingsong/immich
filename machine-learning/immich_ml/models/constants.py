@@ -93,6 +93,9 @@ SUPPORTED_PROVIDERS = [
     "MIGraphXExecutionProvider",
     "OpenVINOExecutionProvider",
     "CoreMLExecutionProvider",
+    # Ascend NPUs (Atlas 300I/310P), supplied by the optional `cann` extra. The provider is only
+    # selected when onnxruntime-cann reports it, so CPU/CUDA images are unaffected.
+    "CANNExecutionProvider",
     "CPUExecutionProvider",
 ]
 

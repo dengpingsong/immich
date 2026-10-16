@@ -1,0 +1,74 @@
+# Machine-learning image variant that runs ONNX models on a Huawei Ascend NPU (Atlas 300I / 310P).
+#
+# Why a separate image: the CANN execution provider comes from `onnxruntime-cann`, which replaces the
+# plain `onnxruntime` package, and CANN's own Python stack (TBE/AOE) needs several dependencies that a
+# slim Python image does not ship. Both were verified necessary: without them `atc`/GE fail with
+# "Failed to init tbe" and the provider cannot build a graph.
+#
+# The CANN **toolkit and driver stay on the host** and are mounted read-only at run time (multi-GB, and
+# they must match the installed driver), so this image stays small.
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEVICE=cann
+
+# Python dependencies of the CANN toolkit's TBE/AOE stack plus the ORT CANN provider.
+RUN pip install --no-cache-dir \
+    "numpy<2" \
+    "decorator" \
+    "attrs" \
+    "sympy" \
+    "scipy" \
+    "protobuf" \
+    "psutil" \
+    "cloudpickle" \
+    "absl-py" \
+    "ml_dtypes" \
+    "tornado" \
+    "requests"
+
+# Immich ML runtime dependencies (kept in step with the vision image, minus the ONNX runtime variants).
+RUN pip install --no-cache-dir \
+    "aiocache>=0.12.1,<1.0" \
+    "fastapi>=0.95.2,<1.0" \
+    "gunicorn>=21.1.0" \
+    "huggingface-hub>=1.0,<2.0" \
+    "opencv-python-headless>=4.7.0.72,<5.0" \
+    "orjson>=3.9.5" \
+    "pillow>=12.2,<13" \
+    "pydantic>=2.0.0,<3" \
+    "pydantic-settings>=2.5.2,<3" \
+    "python-multipart>=0.0.6,<1.0" \
+    "rich>=13.4.2" \
+    "tokenizers>=0.15.0,<1.0" \
+    "uvicorn[standard]>=0.22.0,<1.0" \
+    "rapidocr>=3.1.0" \
+    "onnx"
+
+# rapidocr depends on the plain onnxruntime package, which would overwrite the CANN build. Reinstall the
+# CANN provider last, without dependencies, so the Ascend-enabled library is the one that ships.
+RUN pip install --no-cache-dir --force-reinstall --no-deps "onnxruntime-cann>=1.24.4,<2"
+
+# onnxruntime-cann is built against the numpy 1.x ABI; later layers can pull numpy 2 in, which makes
+# `import onnxruntime` fail with "import numpy failed", so pin it last.
+RUN pip install --no-cache-dir "numpy<2"
+
+WORKDIR /usr/src
+
+COPY immich_ml immich_ml
+COPY scripts/healthcheck.py .
+COPY cann-env.sh /usr/local/bin/cann-env.sh
+
+ENV PYTHONPATH=/usr/src \
+    TRANSFORMERS_CACHE=/cache \
+    HF_HOME=/cache/hf-cache \
+    MACHINE_LEARNING_CACHE_FOLDER=/cache \
+    ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.0.0 \
+    ASCEND_OPP_PATH=/usr/local/Ascend/cann-9.0.0/opp \
+    ASCEND_WORK_PATH=/cache/ascend-work \
+    ASCEND_CACHE_PATH=/cache/ascend-cache
+
+ENTRYPOINT ["/usr/local/bin/cann-env.sh"]
+# Same entry point as the vision image: it starts gunicorn itself with the right module paths.
+CMD ["python", "-m", "immich_ml"]
