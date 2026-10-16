@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { handleEditLibraryFolder } from '$lib/services/library.service';
+  import { executeMutation } from '$lib/queries/client';
+  import { replaceLibraryImportPathMutation } from '$lib/queries/library.query';
   import type { LibraryResponseDto } from '@immich/sdk';
   import { Field, FormModal, Input, Text } from '@immich/ui';
   import { mdiFolderSync } from '@mdi/js';
@@ -16,14 +17,21 @@
   let newValue = $state(oldValue);
 
   const onSubmit = async () => {
-    const success = await handleEditLibraryFolder(library, oldValue, newValue);
-    if (success) {
+    const updated = await executeMutation(replaceLibraryImportPathMutation(), { id: library.id, oldValue, newValue });
+    if (updated) {
       onClose();
     }
   };
 </script>
 
-<FormModal title={$t('library_edit_folder')} icon={mdiFolderSync} {onClose} {onSubmit} size="small">
+<FormModal
+  title={$t('library_edit_folder')}
+  icon={mdiFolderSync}
+  {onClose}
+  {onSubmit}
+  size="small"
+  disabled={!newValue || newValue === oldValue}
+>
   <Text size="small" class="mb-4">{$t('admin.library_folder_description')}</Text>
   <Field label={$t('path')}>
     <Input bind:value={newValue} />

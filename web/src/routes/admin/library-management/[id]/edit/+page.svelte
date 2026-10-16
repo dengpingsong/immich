@@ -1,28 +1,26 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { createDefinedQuery, executeMutation } from '$lib/queries/client';
+  import { getLibraryQuery, renameLibraryMutation } from '$lib/queries/library.query';
   import { Route } from '$lib/route';
-  import { handleUpdateLibrary } from '$lib/services/library.service';
   import { Field, FormModal, Input } from '@immich/ui';
   import { mdiRenameOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
-  import type { PageData } from '../$types';
+  import type { PageProps } from './$types';
 
-  type Props = {
-    data: PageData;
-  };
+  const { params }: PageProps = $props();
 
-  let { data }: Props = $props();
-
-  const library = $state(data.library);
-  let name = $state(library.name);
+  const query = createDefinedQuery(getLibraryQuery(params.id));
+  const library = $derived(query.data);
+  let name = $derived(library.name);
 
   const onClose = async () => {
     await goto(Route.viewLibrary(library));
   };
 
   const onSubmit = async () => {
-    const success = await handleUpdateLibrary(library, { name });
-    if (success) {
+    const response = await executeMutation(renameLibraryMutation(), { id: library.id, name });
+    if (response) {
       await onClose();
     }
   };
