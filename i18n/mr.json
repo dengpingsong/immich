@@ -1718,8 +1718,6 @@
   "setting_image_viewer_help": "डीटेल व्ह्यूअर आधी लहान थंबनेल लोड करतो, नंतर (सक्षम असल्यास) मध्यम आकाराचे प्रिव्ह्यू लोड करतो, आणि शेवटी (सक्षम असल्यास) मूळ प्रतिमा लोड करतो.",
   "setting_image_viewer_original_subtitle": "पूर्ण-रिझोल्यूशनची मूळ प्रतिमा लोड करण्यासाठी सक्षम करा (मोठी). डेटा वापर कमी करण्यासाठी (नेटवर्क व डिव्हाइस कॅश दोन्ही) अक्षम करा.",
   "setting_image_viewer_original_title": "मूळ प्रतिमा लोड करा",
-  "setting_image_viewer_preview_subtitle": "मध्यम-रिझोल्यूशन प्रतिमा लोड करण्यासाठी सक्षम करा. अक्षम केल्यास थेट मूळ प्रतिमा लोड होईल किंवा फक्त थंबनेल वापरला जाईल.",
-  "setting_image_viewer_preview_title": "प्रिव्ह्यू प्रतिमा लोड करा",
   "setting_languages_apply": "लागू करा",
   "setting_languages_subtitle": "अॅपची भाषा बदला",
   "setting_notifications_notify_minutes": "{count} मिनिटे",

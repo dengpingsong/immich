@@ -1959,8 +1959,6 @@
   "setting_image_viewer_help": "نمایشگر جزئیات ابتدا تصویر بندانگشتی کوچک، سپس پیش‌نمایش با اندازهٔ متوسط (در صورت فعال‌بودن) و در نهایت تصویر اصلی (در صورت فعال‌بودن) را بارگذاری می‌کند.",
   "setting_image_viewer_original_subtitle": "فعال‌سازی برای بارگذاری تصویر اصلی با وضوح کامل (بسیار بزرگ!). غیرفعال‌سازی برای کاهش مصرف داده (هم شبکه و هم کش دستگاه).",
   "setting_image_viewer_original_title": "بارگذاری تصویر اصلی",
-  "setting_image_viewer_preview_subtitle": "فعال‌سازی برای بارگذاری تصویر با وضوح متوسط. غیرفعال‌سازی برای بارگذاری مستقیم تصویر اصلی یا فقط استفاده از تصویر بندانگشتی.",
-  "setting_image_viewer_preview_title": "بارگذاری تصویر پیش‌نمایش",
   "setting_languages_apply": "اعمال",
   "setting_languages_subtitle": "تغییر زبان برنامه",
   "setting_notifications_notify_minutes": "{count} دقیقه",

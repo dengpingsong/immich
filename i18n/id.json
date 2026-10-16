@@ -1987,8 +1987,6 @@
   "setting_image_viewer_help": "Penampil detail akan terlebih dahulu memuat gambar mini berukuran kecil, kemudian memuat pratinjau berukuran sedang (jika diaktifkan), dan akhirnya memuat file asli (jika diaktifkan).",
   "setting_image_viewer_original_subtitle": "Aktifkan untuk memuat gambar asli dengan resolusi penuh (berukuran besar!). Nonaktifkan untuk mengurangi penggunaan data (baik jaringan maupun cache perangkat).",
   "setting_image_viewer_original_title": "Muat gambar kualitas asli",
-  "setting_image_viewer_preview_subtitle": "Aktifkan untuk memuat gambar dengan resolusi sedang. Nonaktifkan jika ingin langsung memuat gambar asli atau hanya ingin memuat gambar kecil.",
-  "setting_image_viewer_preview_title": "Muat gambar pratinjau",
   "setting_languages_apply": "Terapkan",
   "setting_languages_subtitle": "Mengubah bahasa pada aplikasi",
   "setting_notifications_notify_minutes": "{count} menit",

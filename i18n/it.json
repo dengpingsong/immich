@@ -1988,8 +1988,6 @@
   "setting_image_viewer_help": "Il visualizzatore dei dettagli carica prima la miniatura piccola, poi quella di medie dimensioni (se abilitata) e infine l'originale (se abilitato).",
   "setting_image_viewer_original_subtitle": "Abilita il caricamento dell’immagine originale in alta risoluzione (dimensioni elevate). Disattiva per ridurre il consumo di dati, sia di rete che in cache locale.",
   "setting_image_viewer_original_title": "Carica l'immagine originale",
-  "setting_image_viewer_preview_subtitle": "Abilita per caricare un'immagine a risoluzione media. Disabilita per caricare direttamente l'immagine originale o usare la miniatura.",
-  "setting_image_viewer_preview_title": "Carica immagine di anteprima",
   "setting_languages_apply": "Applica",
   "setting_languages_subtitle": "Cambia la lingua dell'app",
   "setting_notifications_notify_minutes": "{count} minuti",

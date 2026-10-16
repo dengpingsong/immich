@@ -1943,8 +1943,6 @@
   "setting_image_viewer_help": "Detali peržiūra pirmiausia įkelia mažą miniatiūrą, tada įkelia vidutinio dydžio versiją (jei įjungta) ir galiausiai įkelia originalą (jei įjungta).",
   "setting_image_viewer_original_subtitle": "Įjunkite, kad įkeltumėte originalų pilnos raiškos vaizdą (didelį!). Išjunkite, kad sumažintumėte duomenų naudojimą (tiek tinkle, tiek įrenginio talpykloje).",
   "setting_image_viewer_original_title": "Užkrauti originalią nuotrauką",
-  "setting_image_viewer_preview_subtitle": "Įjunkite, jei norite įkelti vidutinės raiškos vaizdą. Išjunkite, jei norite tiesiogiai įkelti originalą ar naudoti tik miniatiūrą.",
-  "setting_image_viewer_preview_title": "Užkrauti peržiūros nuotrauką",
   "setting_languages_apply": "Pritaikyti",
   "setting_languages_subtitle": "Pakeisti programos kalbą",
   "setting_notifications_notify_minutes": "{count} minučių",

@@ -1757,8 +1757,6 @@
   "setting_image_viewer_help": "डिटेल व्यूअर पहले छोटा थंबनेल लोड करता है, फिर मीडियम-साइज़ प्रीव्यू लोड करता है (अगर इनेबल है), और आखिर में ओरिजिनल लोड करता है (अगर इनेबल है)।",
   "setting_image_viewer_original_subtitle": "ओरिजिनल फुल-रिज़ॉल्यूशन इमेज (बड़ी!) लोड करने के लिए इनेबल करें। डेटा का इस्तेमाल कम करने के लिए डिसेबल करें (नेटवर्क और डिवाइस कैश दोनों)।",
   "setting_image_viewer_original_title": "मूल छवि लोड करें",
-  "setting_image_viewer_preview_subtitle": "मीडियम-रिज़ॉल्यूशन इमेज लोड करने के लिए चालू करें। ओरिजिनल इमेज को सीधे लोड करने या सिर्फ़ थंबनेल इस्तेमाल करने के लिए बंद करें।",
-  "setting_image_viewer_preview_title": "पूर्वावलोकन छवि लोड करें",
   "setting_languages_apply": "आवेदन करना",
   "setting_languages_subtitle": "ऐप की भाषा बदलें",
   "setting_notifications_notify_minutes": "{count} मिनट",

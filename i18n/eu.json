@@ -1910,8 +1910,6 @@
   "setting_image_viewer_help": "Xehetasun-ikusleak miniatura kargatzen du lehenik, gero tamaina ertaineko aurrebista kargatzen du (gaituta badago), azkenik jatorrizkoa kargatzen du (gaituta badago).",
   "setting_image_viewer_original_subtitle": "Gaitu bereizmen osoko jatorrizko irudia kargatzeko (handia!). Desgaitu datuen erabilera murrizteko (sarean eta gailuaren cachean).",
   "setting_image_viewer_original_title": "Jatorrizko irudia kargatu",
-  "setting_image_viewer_preview_subtitle": "Gaitu bereizmen ertaineko irudiak kargatzeko. Desgaitu jatorrizkoa zuzenean kargatzeko edo miniatura soilik erabiltzeko.",
-  "setting_image_viewer_preview_title": "Aurrebista irudia kargatu",
   "setting_languages_apply": "Ezarri",
   "setting_languages_subtitle": "Aplikazioaren hizkuntza aldatu",
   "setting_notifications_notify_minutes": "{count, plural, one {Minutu bat} other {# minutu}}",

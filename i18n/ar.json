@@ -1915,8 +1915,6 @@
   "setting_image_viewer_help": "يقوم عارض التفاصيل بتحميل الصورة المصغرة الصغيرة أولاً ، ثم يقوم بتحميل المعاينة متوسطة الحجم (إذا تم تمكينها) ، ويقوم أخيرًا بتحميل الأصل (إذا تم تمكينه).",
   "setting_image_viewer_original_subtitle": "تمكين تحميل الصورة الكاملة الدقة الأصلية (كبيرة!).تعطيل لتقليل استخدام البيانات (كل من الشبكة وعلى ذاكرة التخزين المؤقت للجهاز).",
   "setting_image_viewer_original_title": "تحميل الصورة الأصلية",
-  "setting_image_viewer_preview_subtitle": "تمكين تحميل صورة متوسطة الدقة.تعطيل إما لتحميل مباشرة أو استخدام الصورة المصغرة مباشرة.",
-  "setting_image_viewer_preview_title": "تحميل صورة معاينة",
   "setting_languages_apply": "تغيير الإعدادات",
   "setting_languages_subtitle": "تغيير لغة التطبيق",
   "setting_notifications_notify_minutes": "{count} دقائق",

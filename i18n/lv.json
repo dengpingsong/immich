@@ -1806,8 +1806,6 @@
   "setting_image_viewer_help": "Detaļu skatītājs vispirms ielādē mazo sīktēlu, pēc tam ielādē vidēja lieluma priekšskatījumu (ja iespējots), visbeidzot ielādē oriģinālu (ja iespējots).",
   "setting_image_viewer_original_subtitle": "Iespējot sākotnējā pilnas izšķirtspējas attēla (liels!) ielādi. Atspējot, lai samazinātu datu lietojumu (gan tīklā, gan ierīces kešatmiņā).",
   "setting_image_viewer_original_title": "Ielādēt oriģinālo attēlu",
-  "setting_image_viewer_preview_subtitle": "Iespējojiet vidējas izšķirtspējas attēla ielādēšanu. Atspējojiet vai nu tiešu oriģināla ielādi, vai izmantojiet tikai sīktēlu.",
-  "setting_image_viewer_preview_title": "Ielādēt priekšskatījuma attēlu",
   "setting_languages_apply": "Lietot",
   "setting_languages_subtitle": "Mainīt lietotnes valodu",
   "setting_notifications_notify_minutes": "{count} minūtes",

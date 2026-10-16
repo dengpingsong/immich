@@ -1398,8 +1398,6 @@
   "setting_image_viewer_help": "Прегледач детаља прво учитава малу сличицу, затим преглед средње величине (ако је омогућен), и на крају оригинал (ако је омогућен).",
   "setting_image_viewer_original_subtitle": "Активирај учитавање слика у пуној резолуцији (Велика!). Деактивацијом ове ставке можеш да смањиш потрошњу интернета и заузетог простора на уређају.",
   "setting_image_viewer_original_title": "Учитај оригиналну слику",
-  "setting_image_viewer_preview_subtitle": "Активирај учитавање слика у средњој резолуцији. Деактивирај да се директно учитава оригинал, или да се само користи минијатура.",
-  "setting_image_viewer_preview_title": "Прегледај слику",
   "setting_languages_apply": "Примени",
   "setting_languages_subtitle": "Промените језик апликације",
   "setting_notifications_notify_minutes": "{count} минута",

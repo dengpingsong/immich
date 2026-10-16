@@ -1949,8 +1949,6 @@
   "setting_image_viewer_help": "ডিটেইল ভিউয়ার প্রথমে ছোট থাম্বনেইল লোড করে, তারপর মাঝারি আকারের প্রিভিউ লোড করে (চালু থাকলে), অবশেষে মূল ছবি লোড করে (চালু থাকলে)।",
   "setting_image_viewer_original_subtitle": "মূল পূর্ণ-রেজোলিউশন ছবি লোড করতে চালু করুন (বড়!)। ডেটা ব্যবহার কমাতে (নেটওয়ার্ক ও ডিভাইস ক্যাশ উভয়ই) নিষ্ক্রিয় করুন।",
   "setting_image_viewer_original_title": "মূল ছবি লোড করুন",
-  "setting_image_viewer_preview_subtitle": "মাঝারি-রেজোলিউশন ছবি লোড করতে চালু করুন। সরাসরি মূল ছবি লোড করতে বা শুধুমাত্র থাম্বনেইল ব্যবহার করতে নিষ্ক্রিয় করুন।",
-  "setting_image_viewer_preview_title": "প্রিভিউ ছবি লোড করুন",
   "setting_languages_apply": "প্রয়োগ করুন",
   "setting_languages_subtitle": "অ্যাপের ভাষা পরিবর্তন করুন",
   "setting_notifications_notify_minutes": "{count} মিনিট",
