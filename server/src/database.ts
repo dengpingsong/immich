@@ -256,6 +256,9 @@ export type Person = {
 };
 
 export type AssetFace = {
+  sourceAssetId: string | null;
+  timestampMs: number | null;
+  appearances: import('src/utils/video-face').FaceAppearance[];
   id: string;
   deletedAt: Date | null;
   assetId: string;

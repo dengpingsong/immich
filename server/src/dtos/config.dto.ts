@@ -193,6 +193,7 @@ const AdminConfigSchemaWithVisibility = z
         library: AdminConfigJobSettingsSchema,
         notifications: AdminConfigJobSettingsSchema,
         ocr: AdminConfigJobSettingsSchema,
+        transcription: AdminConfigJobSettingsSchema,
         workflow: AdminConfigJobSettingsSchema,
         editor: AdminConfigJobSettingsSchema,
         integrityCheck: AdminConfigJobSettingsSchema,
@@ -208,6 +209,16 @@ const AdminConfigSchemaWithVisibility = z
       .object({
         enabled: configBool.describe('Enabled').meta({ visibility: User }),
         urls: z.array(z.string()).min(1).describe('ML service URLs'),
+        facialRecognitionUrls: z
+          .array(z.string())
+          .describe(
+            'Optional separate ML service URLs for face detection and recognition, for example a GPU worker while CLIP runs elsewhere. Empty uses the general URLs.',
+          ),
+        clipUrls: z
+          .array(z.string())
+          .describe(
+            'Optional separate ML service URLs for CLIP and duplicate detection, for example a GPU worker while faces run on another accelerator. Empty uses the general URLs.',
+          ),
         availabilityChecks: z
           .object({
             enabled: configBool.describe('Enabled'),
@@ -225,6 +236,31 @@ const AdminConfigSchemaWithVisibility = z
             .meta({ format: 'double' }),
         }).meta({ id: 'AdminConfigDuplicateDetectionDto' }),
         facialRecognition: AdminConfigMachineLearningModelSchema.extend({
+          videoFaces: z
+            .object({
+              enabled: z.boolean().describe('Enable multi-frame video and Live Photo face detection'),
+              intervalMs: z.int().min(100).max(60_000).describe('Video sampling interval in milliseconds'),
+              livePhotoIntervalMs: z
+                .int()
+                .min(100)
+                .max(10_000)
+                .describe('Live Photo sampling interval in milliseconds'),
+              maxFrames: z
+                .int()
+                .min(0)
+                .max(300)
+                .describe('Optional maximum sampled frames per video; 0 means unlimited'),
+              minSimilarity: z
+                .number()
+                .min(0)
+                .max(1)
+                .describe('Minimum cosine similarity for within-asset face deduplication')
+                .meta({ format: 'double' }),
+              keyframesOnly: configBool.describe(
+                'Decode only key frames when sampling a video, which is several times faster; sampling times stay on the configured grid',
+              ),
+            })
+            .meta({ id: 'AdminConfigVideoFacesDto' }),
           minScore: z
             .number()
             .min(0.1)
@@ -243,6 +279,30 @@ const AdminConfigSchemaWithVisibility = z
             .describe('Minimum number of faces required for recognition')
             .meta({ visibility: User }),
         }).meta({ id: 'AdminConfigFacialRecognitionDto' }),
+        transcription: z
+          .object({
+            enabled: z
+              .boolean()
+              .describe('Enable automatic video subtitles via a Whisper-compatible transcription worker'),
+            url: z.string().describe('Transcription worker URL (internal, never exposed to browsers)'),
+            apiKey: z.string().describe('Shared secret sent to the transcription worker'),
+            modelName: z.string().describe('Transcription model label reported by the worker'),
+            language: z
+              .string()
+              .describe('Optional source language hint (empty = detect the original language per chunk)'),
+            maxChunkMs: z
+              .int()
+              .min(5000)
+              .max(32_000)
+              .describe('Audio window sent to the worker per request, in milliseconds'),
+            noSpeechThreshold: z
+              .number()
+              .min(0)
+              .max(1)
+              .describe('Discard cues whose no-speech probability is at least this value')
+              .meta({ format: 'double' }),
+          })
+          .meta({ id: 'AdminConfigTranscriptionDto' }),
         ocr: AdminConfigMachineLearningModelSchema.extend({
           maxResolution: z.int().min(1).describe('Maximum resolution for OCR processing'),
           minDetectionScore: z
@@ -607,6 +667,7 @@ export const defaults = Object.freeze<SystemConfig>({
     sidecar: { concurrency: 5 },
     library: { concurrency: 5 },
     notifications: { concurrency: 5 },
+    transcription: { concurrency: 1 },
     ocr: { concurrency: 1 },
     workflow: { concurrency: 5 },
     editor: { concurrency: 2 },
@@ -619,6 +680,8 @@ export const defaults = Object.freeze<SystemConfig>({
   machineLearning: {
     enabled: process.env.IMMICH_MACHINE_LEARNING_ENABLED !== 'false',
     urls: [process.env.IMMICH_MACHINE_LEARNING_URL || 'http://immich-machine-learning:3003'],
+    facialRecognitionUrls: [],
+    clipUrls: [],
     availabilityChecks: {
       enabled: true,
       timeout: 2000,
@@ -633,11 +696,28 @@ export const defaults = Object.freeze<SystemConfig>({
       maxDistance: 0.01,
     },
     facialRecognition: {
+      videoFaces: {
+        enabled: false,
+        intervalMs: 2000,
+        livePhotoIntervalMs: 500,
+        maxFrames: 0,
+        minSimilarity: 0.55,
+        keyframesOnly: false,
+      },
       enabled: true,
       modelName: 'buffalo_l',
       minScore: 0.7,
       maxDistance: 0.5,
       minFaces: 3,
+    },
+    transcription: {
+      enabled: false,
+      url: 'http://immich-transcription:3004',
+      apiKey: '',
+      modelName: 'faster-whisper:tiny',
+      language: '',
+      maxChunkMs: 30_000,
+      noSpeechThreshold: 0.6,
     },
     ocr: {
       enabled: true,

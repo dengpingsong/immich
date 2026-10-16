@@ -42,6 +42,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     [QueueName.VideoConversion]: { concurrency: 1 },
     [QueueName.Notification]: { concurrency: 5 },
     [QueueName.Ocr]: { concurrency: 1 },
+    [QueueName.Transcription]: { concurrency: 1 },
     [QueueName.Workflow]: { concurrency: 5 },
     [QueueName.IntegrityCheck]: { concurrency: 1 },
     [QueueName.Editor]: { concurrency: 2 },
@@ -109,6 +110,8 @@ const updatedConfig = Object.freeze<SystemConfig>({
   machineLearning: {
     enabled: true,
     urls: ['http://immich-machine-learning:3003'],
+    facialRecognitionUrls: [],
+    clipUrls: [],
     availabilityChecks: {
       enabled: true,
       interval: 30_000,
@@ -123,11 +126,28 @@ const updatedConfig = Object.freeze<SystemConfig>({
       maxDistance: 0.01,
     },
     facialRecognition: {
+      videoFaces: {
+        enabled: false,
+        intervalMs: 2000,
+        livePhotoIntervalMs: 500,
+        maxFrames: 0,
+        minSimilarity: 0.55,
+        keyframesOnly: false,
+      },
       enabled: true,
       modelName: 'buffalo_l',
       minScore: 0.7,
       maxDistance: 0.5,
       minFaces: 3,
+    },
+    transcription: {
+      enabled: false,
+      url: 'http://immich-transcription:3004',
+      apiKey: '',
+      modelName: 'faster-whisper:tiny',
+      language: '',
+      maxChunkMs: 30_000,
+      noSpeechThreshold: 0.6,
     },
     ocr: {
       enabled: true,

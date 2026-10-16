@@ -371,11 +371,21 @@ export class PersonRepository {
         'asset_face.boundingBoxY2 as y2',
         'asset_face.imageWidth as oldWidth',
         'asset_face.imageHeight as oldHeight',
+        'asset_face.timestampMs',
+        'asset_face.sourceAssetId',
         'asset.type',
         'asset.originalPath',
         'asset_exif.orientation as exifOrientation',
       ])
       .select((eb) => withFilePath(eb, AssetFileType.Preview).as('previewPath'))
+      .select((eb) =>
+        eb
+          .selectFrom('asset as source')
+          .select('source.originalPath')
+          .whereRef('source.id', '=', 'asset_face.sourceAssetId')
+          .whereRef('source.ownerId', '=', 'asset.ownerId')
+          .as('sourcePath'),
+      )
       .where('person.ownerId', '=', ownerId)
       .where('person.personGroupId', '=', personGroupId)
       .where('asset_face.deletedAt', 'is', null)
@@ -627,6 +637,108 @@ export class PersonRepository {
     }
 
     await query.selectFrom(dummy).execute();
+  }
+
+  getFaceEmbeddings(assetId: string) {
+    return this.db
+      .selectFrom('face_search')
+      .innerJoin('asset_face', 'asset_face.id', 'face_search.faceId')
+      .select(['face_search.faceId', 'face_search.embedding'])
+      .where('asset_face.assetId', '=', assetId)
+      .execute();
+  }
+
+  async refreshVideoFaces(
+    assetId: string,
+    faces: (Insertable<AssetFaceTable> & { id: string })[],
+    removeIds: string[],
+    embeddings: Insertable<FaceSearchTable>[],
+    expectedFaces: { id: string; updateId: string }[],
+    expectedSource: { id: string; originalPath: string; ownerId: string },
+  ) {
+    return this.db.transaction().execute(async (db) => {
+      // Reject stale inference instead of overwriting concurrent recognition or user edits.
+      const parent = await db
+        .selectFrom('asset')
+        .select(['id', 'livePhotoVideoId', 'ownerId', 'originalPath', 'deletedAt'])
+        .where('id', '=', assetId)
+        .forUpdate()
+        .executeTakeFirstOrThrow();
+      const source =
+        parent.id === expectedSource.id
+          ? parent
+          : await db
+              .selectFrom('asset')
+              .select(['id', 'ownerId', 'originalPath', 'deletedAt'])
+              .where('id', '=', expectedSource.id)
+              .forShare()
+              .executeTakeFirst();
+      if (
+        !source ||
+        parent.deletedAt ||
+        source.deletedAt ||
+        parent.ownerId !== expectedSource.ownerId ||
+        source.ownerId !== expectedSource.ownerId ||
+        source.originalPath !== expectedSource.originalPath ||
+        (parent.id !== expectedSource.id && parent.livePhotoVideoId !== expectedSource.id)
+      ) {
+        throw new Error('Motion source changed during video inference; retry detection');
+      }
+      const current = await db
+        .selectFrom('asset_face')
+        .select(['id', 'updateId'])
+        .where('assetId', '=', assetId)
+        .forUpdate()
+        .execute();
+      const expected = new Map(expectedFaces.map((face) => [face.id, face.updateId]));
+      if (current.length !== expected.size || current.some((face) => expected.get(face.id) !== face.updateId)) {
+        throw new Error('Faces changed during video inference; retry detection');
+      }
+      if (removeIds.length > 0) {
+        await db.deleteFrom('asset_face').where('id', 'in', removeIds).where('assetId', '=', assetId).execute();
+      }
+      if (faces.length > 0) {
+        await db
+          .insertInto('asset_face')
+          .values(faces)
+          .onConflict((oc) =>
+            oc.column('id').doUpdateSet((eb) => ({
+              sourceAssetId: eb.ref('excluded.sourceAssetId'),
+              timestampMs: eb.ref('excluded.timestampMs'),
+              appearances: eb.ref('excluded.appearances'),
+              imageWidth: eb.ref('excluded.imageWidth'),
+              imageHeight: eb.ref('excluded.imageHeight'),
+              boundingBoxX1: eb.ref('excluded.boundingBoxX1'),
+              boundingBoxY1: eb.ref('excluded.boundingBoxY1'),
+              boundingBoxX2: eb.ref('excluded.boundingBoxX2'),
+              boundingBoxY2: eb.ref('excluded.boundingBoxY2'),
+            })),
+          )
+          .execute();
+      }
+      if (embeddings.length > 0) {
+        await db
+          .insertInto('face_search')
+          .values(embeddings)
+          .onConflict((oc) =>
+            oc.column('faceId').doUpdateSet((eb) => ({
+              embedding: eb.ref('excluded.embedding'),
+            })),
+          )
+          .execute();
+      }
+      return faces.length === 0
+        ? []
+        : db
+            .selectFrom('person')
+            .select(['ownerId', 'personGroupId'])
+            .where(
+              'faceAssetId',
+              'in',
+              faces.map((face) => face.id),
+            )
+            .execute();
+    });
   }
 
   async update(person: Updateable<PersonTable> & PersonId) {

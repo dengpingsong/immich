@@ -233,7 +233,24 @@ export class AssetJobRepository {
   getForDetectFacesJob(id: string) {
     return this.db
       .selectFrom('asset')
-      .select(['asset.id', 'asset.visibility'])
+      .select([
+        'asset.id',
+        'asset.visibility',
+        'asset.type',
+        'asset.ownerId',
+        'asset.originalPath',
+        'asset.livePhotoVideoId',
+      ])
+      .select((eb) =>
+        jsonObjectFrom(
+          eb
+            .selectFrom('asset as motion')
+            .select(['motion.id', 'motion.originalPath', 'motion.type'])
+            .whereRef('motion.id', '=', 'asset.livePhotoVideoId')
+            .whereRef('motion.ownerId', '=', 'asset.ownerId')
+            .where('motion.deletedAt', 'is', null),
+        ).as('motionAsset'),
+      )
       .$call(withExifInner)
       .select((eb) => withFaces(eb, true, true))
       .select((eb) =>
@@ -248,6 +265,33 @@ export class AssetJobRepository {
         ).as('previewFile'),
       )
       .where('asset.id', '=', id)
+      .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getForTranscription(id: string) {
+    return this.db
+      .selectFrom('asset')
+      .select([
+        'asset.id',
+        'asset.visibility',
+        'asset.type',
+        'asset.ownerId',
+        'asset.originalPath',
+        'asset.livePhotoVideoId',
+      ])
+      .select((eb) =>
+        jsonObjectFrom(
+          eb
+            .selectFrom('asset as motion')
+            .select(['motion.id', 'motion.originalPath', 'motion.type'])
+            .whereRef('motion.id', '=', 'asset.livePhotoVideoId')
+            .whereRef('motion.ownerId', '=', 'asset.ownerId')
+            .where('motion.deletedAt', 'is', null),
+        ).as('motionAsset'),
+      )
+      .where('asset.id', '=', id)
+      .where('asset.deletedAt', 'is', null)
       .executeTakeFirst();
   }
 
@@ -448,7 +492,24 @@ export class AssetJobRepository {
 
   @GenerateSql({ params: [], stream: true })
   streamForDetectFacesJob(force?: boolean) {
-    return this.assetsWithPreviews()
+    return this.db
+      .selectFrom('asset')
+      .where('asset.visibility', '!=', AssetVisibility.Hidden)
+      .where('asset.deletedAt', 'is', null)
+      .innerJoin('asset_job_status as job_status', 'assetId', 'asset.id')
+      .where((eb) =>
+        eb.or([
+          // Video faces are sampled from the video file itself, so requiring a preview would only delay
+          // them. Images are still detected from their preview, so they keep that prerequisite.
+          eb('asset.type', '=', AssetType.Video),
+          eb.exists((qb) =>
+            qb
+              .selectFrom('asset_file')
+              .whereRef('assetId', '=', 'asset.id')
+              .where('asset_file.type', '=', AssetFileType.Preview),
+          ),
+        ]),
+      )
       .$if(force === false, (qb) => qb.where('job_status.facesRecognizedAt', 'is', null))
       .select(['asset.id'])
       .orderBy('asset.fileCreatedAt', 'desc')
@@ -473,5 +534,27 @@ export class AssetJobRepository {
   @GenerateSql({ params: [DummyValue.DATE], stream: true })
   streamForMigrationJob() {
     return this.db.selectFrom('asset').select(['id']).where('asset.deletedAt', 'is', null).stream();
+  }
+
+  /**
+   * Videos and Live Photos whose audio can be transcribed. Without `force`, assets that already have a
+   * transcript are skipped so a re-run does not redo finished work.
+   */
+  @GenerateSql({ params: [DummyValue.BOOLEAN], stream: true })
+  streamForTranscriptionJob(force?: boolean) {
+    return this.db
+      .selectFrom('asset')
+      .leftJoin('asset_subtitle', 'asset_subtitle.assetId', 'asset.id')
+      .select(['asset.id'])
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', '!=', AssetVisibility.Hidden)
+      .where((eb) =>
+        eb.or([
+          eb('asset.type', '=', AssetType.Video),
+          eb.and([eb('asset.type', '=', AssetType.Image), eb('asset.livePhotoVideoId', 'is not', null)]),
+        ]),
+      )
+      .$if(!force, (qb) => qb.where('asset_subtitle.assetId', 'is', null))
+      .stream();
   }
 }

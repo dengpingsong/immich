@@ -18,6 +18,9 @@ export class AssetFaceFactory {
   static from(dto: AssetFaceLike = {}) {
     return new AssetFaceFactory({
       assetId: newUuid(),
+      sourceAssetId: null,
+      timestampMs: null,
+      appearances: [],
       boundingBoxX1: 100,
       boundingBoxX2: 200,
       boundingBoxY1: 100,

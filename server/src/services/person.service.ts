@@ -5,6 +5,7 @@ import { Person } from 'src/database';
 import { Chunked, OnJob } from 'src/decorators';
 import { BulkIdErrorReason, BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
+import { SystemConfig } from 'src/dtos/config.dto';
 import {
   AssetFaceCreateDto,
   AssetFaceDeleteDto,
@@ -23,6 +24,7 @@ import {
   PersonUpdateDto,
 } from 'src/dtos/person.dto';
 import {
+  AssetType,
   AssetVisibility,
   CacheControl,
   JobName,
@@ -34,6 +36,7 @@ import {
   SystemMetadataKey,
   VectorIndex,
 } from 'src/enum';
+import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { BoundingBox } from 'src/repositories/machine-learning.repository';
 import { PersonId, UpdateFacesData } from 'src/repositories/person.repository';
 import { DB } from 'src/schema/index';
@@ -47,6 +50,7 @@ import { ImmichFileResponse } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 import { batched, findOrFail, isFacialRecognitionEnabled } from 'src/utils/misc';
 import { Point, transformPoints } from 'src/utils/transform';
+import { aggregateVideoFaces, decodeFaceEmbedding, faceSimilarity, SampledFace } from 'src/utils/video-face';
 
 const personKey = ({ ownerId, personGroupId }: PersonId) => `${ownerId}/${personGroupId}`;
 
@@ -328,12 +332,27 @@ export class PersonService extends BaseService {
 
     const asset = await this.assetJobRepository.getForDetectFacesJob(id);
     const previewFile = asset?.previewFile;
-    if (!asset || !previewFile) {
+    if (!asset) {
       return JobStatus.Failed;
     }
 
     if (asset.visibility === AssetVisibility.Hidden) {
       return JobStatus.Skipped;
+    }
+
+    if (
+      (asset.type === AssetType.Video || asset.livePhotoVideoId) &&
+      machineLearning.facialRecognition.videoFaces.enabled
+    ) {
+      return this.detectVideoFaces(asset, machineLearning.facialRecognition);
+    }
+    // Disabling sampling or unlinking a Live Photo must not let a legacy preview pass
+    // erase temporal identities or match video coordinates against the static image.
+    if (asset.faces.some((face) => face.sourceAssetId || face.timestampMs !== null || face.appearances.length > 0)) {
+      return JobStatus.Skipped;
+    }
+    if (!previewFile) {
+      return JobStatus.Failed;
     }
 
     const { imageHeight, imageWidth, faces } = await this.machineLearningRepository.detectFaces(
@@ -400,6 +419,153 @@ export class PersonService extends BaseService {
 
     await this.assetRepository.upsertJobStatus({ assetId: asset.id, facesRecognizedAt: new Date() });
 
+    return JobStatus.Success;
+  }
+
+  private async detectVideoFaces(
+    asset: NonNullable<Awaited<ReturnType<AssetJobRepository['getForDetectFacesJob']>>>,
+    options: SystemConfig['machineLearning']['facialRecognition'],
+  ): Promise<JobStatus> {
+    const motion = asset.type === AssetType.Video ? asset : asset.motionAsset;
+    if (!motion || motion.type !== AssetType.Video) {
+      throw new Error(`Motion source missing for asset ${asset.id}`);
+    }
+    const candidates: SampledFace[] = [];
+    if (asset.type !== AssetType.Video) {
+      if (!asset.previewFile) {
+        return JobStatus.Failed;
+      }
+      const result = await this.machineLearningRepository.detectFaces(asset.previewFile.path, options);
+      candidates.push(
+        ...result.faces.map((face) => ({
+          ...face,
+          timestampMs: null,
+          imageWidth: result.imageWidth,
+          imageHeight: result.imageHeight,
+        })),
+      );
+    }
+    const sampling = options.videoFaces;
+    // One decode process per video: the sampler used to start FFmpeg per sampled frame, which dominated
+    // the cost (421ms/frame per frame vs 83ms/frame in one pass).
+    //
+    // Decoding stays on the CPU. Per-video microbenchmarks favour NVDEC (80s -> 37s on a one hour clip),
+    // but in the running pipeline it is much slower: with four jobs in flight the GPU serialises the
+    // decode sessions, the frames are copied back to the host for scaling, and the CLIP worker shares
+    // the same device. Measured end to end: 147 videos/minute with software decoding versus 12/minute
+    // with NVDEC. Skipping non-key frames is the accelerator-free win instead (80s -> 29s).
+    for await (const frame of this.mediaRepository.streamVideoFaceFrames(motion.originalPath, {
+      intervalMs: asset.type === AssetType.Video ? sampling.intervalMs : sampling.livePhotoIntervalMs,
+      maxFrames: sampling.maxFrames,
+      keyframesOnly: sampling.keyframesOnly,
+    })) {
+      const result = await this.machineLearningRepository.detectFaces(frame.buffer, options);
+      candidates.push(
+        ...result.faces.map((face) => ({
+          ...face,
+          timestampMs: frame.timestampMs,
+          imageWidth: result.imageWidth,
+          imageHeight: result.imageHeight,
+        })),
+      );
+    }
+    // Do not mutate persisted detections until every required frame has succeeded.
+    const groups = aggregateVideoFaces(candidates, sampling.minSimilarity);
+    const existingEmbeddings = await this.personRepository.getFaceEmbeddings(asset.id);
+    const vectors = new Map(
+      existingEmbeddings.map(({ faceId, embedding }) => [faceId, decodeFaceEmbedding(embedding)]),
+    );
+    const used = new Set<string>();
+    const faces: (Insertable<AssetFaceTable> & { id: string })[] = [];
+    const embeddings: FaceSearchTable[] = [];
+    const newIds: string[] = [];
+    for (const group of groups) {
+      const vector = decodeFaceEmbedding(group.embedding);
+      const sourceAssetId = motion.id;
+      const available = asset.faces.filter((face) => !used.has(face.id));
+      const strongest = available
+        .map((face) => ({
+          face,
+          similarity: vectors.has(face.id) ? faceSimilarity(vectors.get(face.id)!, vector) : -1,
+        }))
+        .sort((a, b) => b.similarity - a.similarity)[0];
+      const match =
+        strongest && strongest.similarity >= sampling.minSimilarity
+          ? strongest.face
+          : available.find((old) => {
+              if (used.has(old.id)) {
+                return false;
+              }
+              const previous = vectors.get(old.id);
+              if (previous) {
+                return false;
+              }
+              if (
+                (group.timestampMs !== null && (old.sourceAssetId ?? null) !== sourceAssetId) ||
+                (old.timestampMs ?? null) !== group.timestampMs
+              ) {
+                return false;
+              }
+              return (
+                this.iou(old, {
+                  x1: (group.boundingBox.x1 * old.imageWidth) / group.imageWidth,
+                  x2: (group.boundingBox.x2 * old.imageWidth) / group.imageWidth,
+                  y1: (group.boundingBox.y1 * old.imageHeight) / group.imageHeight,
+                  y2: (group.boundingBox.y2 * old.imageHeight) / group.imageHeight,
+                }) > 0.5
+              );
+            });
+      if (match) {
+        used.add(match.id);
+        // Respect deleted faces and manually positioned face boxes.
+        if (match.deletedAt || match.sourceType !== SourceType.MachineLearning) {
+          continue;
+        }
+      }
+      const id = match?.id ?? this.cryptoRepository.randomUUID();
+      if (!match) {
+        newIds.push(id);
+      }
+      faces.push({
+        id,
+        assetId: asset.id,
+        sourceAssetId,
+        timestampMs: group.timestampMs,
+        appearances: group.appearances,
+        imageWidth: group.imageWidth,
+        imageHeight: group.imageHeight,
+        boundingBoxX1: group.boundingBox.x1,
+        boundingBoxY1: group.boundingBox.y1,
+        boundingBoxX2: group.boundingBox.x2,
+        boundingBoxY2: group.boundingBox.y2,
+      });
+      embeddings.push({ faceId: id, embedding: group.embedding });
+    }
+    // Never discard a user's assigned, manually created or suppressed face during a rerun.
+    const removeIds = asset.faces
+      .filter(
+        (face) =>
+          !used.has(face.id) &&
+          !face.personGroupId &&
+          !face.deletedAt &&
+          face.sourceType === SourceType.MachineLearning,
+      )
+      .map((face) => face.id);
+    const covers = await this.personRepository.refreshVideoFaces(asset.id, faces, removeIds, embeddings, asset.faces, {
+      id: motion.id,
+      originalPath: motion.originalPath,
+      ownerId: asset.ownerId,
+    });
+    if (covers?.length) {
+      await this.jobRepository.queueAll(covers.map((data) => ({ name: JobName.PersonGenerateThumbnail, data })));
+    }
+    if (newIds.length > 0) {
+      await this.jobRepository.queueAll([
+        { name: JobName.FacialRecognitionQueueAll, data: { force: false } },
+        ...newIds.map((id) => ({ name: JobName.FacialRecognition, data: { id } }) as const),
+      ]);
+    }
+    await this.assetRepository.upsertJobStatus({ assetId: asset.id, facesRecognizedAt: new Date() });
     return JobStatus.Success;
   }
 

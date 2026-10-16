@@ -5,6 +5,7 @@ import { AppController } from 'src/controllers/app.controller';
 import { AssetFilesController } from 'src/controllers/asset-file.controller';
 import { AssetMediaController } from 'src/controllers/asset-media.controller';
 import { AssetController } from 'src/controllers/asset.controller';
+import { SubtitleController } from 'src/controllers/subtitle.controller';
 import { AuthAdminController } from 'src/controllers/auth-admin.controller';
 import { AuthController } from 'src/controllers/auth.controller';
 import { ClusterGroupController } from 'src/controllers/cluster-group.controller';
@@ -51,6 +52,7 @@ export const controllers = [
   AlbumController,
   AppController,
   AssetController,
+  SubtitleController,
   AssetFilesController,
   AssetMediaController,
   AuthController,

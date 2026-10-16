@@ -48,11 +48,13 @@ import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.re
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
 import { StackRepository } from 'src/repositories/stack.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
+import { SubtitleRepository } from 'src/repositories/subtitle.repository';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository';
 import { SyncRepository } from 'src/repositories/sync.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { TagRepository } from 'src/repositories/tag.repository';
 import { TelemetryRepository } from 'src/repositories/telemetry.repository';
+import { TranscriptionRepository } from 'src/repositories/transcription.repository';
 import { TrashRepository } from 'src/repositories/trash.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { VersionHistoryRepository } from 'src/repositories/version-history.repository';
@@ -98,6 +100,8 @@ export const BASE_SERVICE_DEPENDENCIES = [
   NotificationRepository,
   OAuthRepository,
   OcrRepository,
+  SubtitleRepository,
+  TranscriptionRepository,
   PartnerRepository,
   PersonRepository,
   PluginRepository,
@@ -160,6 +164,8 @@ export class BaseService {
     protected notificationRepository: NotificationRepository,
     protected oauthRepository: OAuthRepository,
     protected ocrRepository: OcrRepository,
+    protected subtitleRepository: SubtitleRepository,
+    protected transcriptionRepository: TranscriptionRepository,
     protected partnerRepository: PartnerRepository,
     protected personRepository: PersonRepository,
     protected pluginRepository: PluginRepository,
@@ -231,6 +237,8 @@ export class BaseService {
       ctx.notificationRepository,
       ctx.oauthRepository,
       ctx.ocrRepository,
+      ctx.subtitleRepository,
+      ctx.transcriptionRepository,
       ctx.partnerRepository,
       ctx.personRepository,
       ctx.pluginRepository,

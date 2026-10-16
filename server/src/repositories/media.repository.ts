@@ -3,9 +3,9 @@ import { ExifDateTime, exiftool, WriteTags } from 'exiftool-vendored';
 import ffmpeg, { FfprobeData, FfprobeStream } from 'fluent-ffmpeg';
 import _ from 'lodash';
 import { Duration } from 'luxon';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
-import { Writable } from 'node:stream';
+import { PassThrough, Writable } from 'node:stream';
 import sharp from 'sharp';
 import { ORIENTATION_TO_SHARP_ROTATION } from 'src/constants';
 import { Exif } from 'src/database';
@@ -23,6 +23,7 @@ import {
   HevcProfile,
   LogLevel,
   RawExtractedFormat,
+  TranscodeHardwareAcceleration,
 } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import {
@@ -36,6 +37,8 @@ import {
   VideoPacketInfo,
 } from 'src/types';
 import { handlePromiseError } from 'src/utils/misc';
+import { JpegFrameSplitter } from 'src/utils/mjpeg';
+import { TRANSCRIPTION_SAMPLE_RATE, TranscriptionChunk, validateTranscriptionChunk } from 'src/utils/transcription';
 import { createAffineMatrix } from 'src/utils/transform';
 
 const probe = (input: string, options: string[]): Promise<FfprobeData> =>
@@ -57,6 +60,16 @@ type ProgressEvent = {
 export type ExtractResult = {
   buffer: Buffer;
   format: RawExtractedFormat;
+};
+
+/**
+ * `child.kill()` on a process that already exited emits an `error` event (ESRCH). fluent-ffmpeg's own
+ * error handler then calls its end callback without the output rings and throws a TypeError, which is
+ * an uncaught exception that takes the whole worker down. Never signal a finished process.
+ */
+const isProcessRunning = (command: unknown): boolean => {
+  const child = (command as { ffmpegProc?: ChildProcess }).ffmpegProc;
+  return child !== undefined && child.exitCode === null && child.signalCode === null;
 };
 
 @Injectable()
@@ -371,6 +384,253 @@ export class MediaRepository {
         });
       });
     });
+  }
+
+  /** Accurate input seeking decodes from the preceding keyframe; never use thumbnail selection here. */
+  async extractVideoFaceFrame(
+    input: string,
+    timestampMs: number,
+    options: { accel?: TranscodeHardwareAcceleration; accelDecode?: boolean } = {},
+  ): Promise<Buffer> {
+    if (!Number.isFinite(timestampMs) || timestampMs < 0) {
+      throw new Error('Invalid video face timestamp');
+    }
+
+    const useCuda = options.accel === TranscodeHardwareAcceleration.Nvenc && options.accelDecode !== false;
+    try {
+      return await this.runVideoFaceFrame(input, timestampMs, useCuda);
+    } catch (error: any) {
+      if (!useCuda) {
+        throw error;
+      }
+      // Hardware decode can fail for codecs the GPU cannot handle; fall back to software decoding
+      // rather than failing the whole face detection job.
+      this.logger.warn(`CUDA-accelerated frame extraction failed, retrying in software: ${error?.message ?? error}`);
+      return this.runVideoFaceFrame(input, timestampMs, false);
+    }
+  }
+
+  /**
+   * Decodes every face-sampling frame of a video with ONE FFmpeg process and yields them in order.
+   *
+   * Spawning a process per sampled frame made the sampler spend most of its time on process start-up,
+   * so all frames come from a single decode. The stream deliberately does NOT probe the file first: a
+   * probe is an extra pass over a slow disk, and ffprobe has no timeout here, so an interrupted probe
+   * left a zombie child and hung the job forever. The `fps` filter emits on the sampling grid, which
+   * makes frame N exactly N * interval.
+   */
+  async *streamVideoFaceFrames(
+    input: string,
+    options: {
+      intervalMs: number;
+      maxFrames?: number;
+      accel?: TranscodeHardwareAcceleration;
+      accelDecode?: boolean;
+      keyframesOnly?: boolean;
+    },
+  ): AsyncGenerator<{ timestampMs: number; buffer: Buffer }> {
+    const { intervalMs, maxFrames = 0 } = options;
+    if (!Number.isSafeInteger(intervalMs) || intervalMs <= 0) {
+      throw new Error('Invalid video face interval');
+    }
+    if (!Number.isSafeInteger(maxFrames) || maxFrames < 0) {
+      throw new Error('Invalid video face frame cap');
+    }
+
+    const fps = 1000 / intervalMs;
+    const useCuda = options.accel === TranscodeHardwareAcceleration.Nvenc && options.accelDecode !== false;
+    const keyframesOnly = options.keyframesOnly === true;
+    // Per-stream state: several videos are sampled concurrently, so this must not live on the instance.
+    const progress = { frames: 0 };
+    try {
+      yield* this.runVideoFaceStream(input, intervalMs, fps, maxFrames, useCuda, progress, keyframesOnly);
+    } catch (error: any) {
+      // Hardware decoding can reject codecs the GPU cannot handle; only a stream that never produced a
+      // frame can be replayed without duplicating work.
+      if (!useCuda || progress.frames > 0) {
+        throw error;
+      }
+      this.logger.warn(`CUDA-accelerated frame decoding failed, retrying in software: ${error?.message ?? error}`);
+      yield* this.runVideoFaceStream(input, intervalMs, fps, maxFrames, false, progress, keyframesOnly);
+    }
+  }
+
+  private async *runVideoFaceStream(
+    input: string,
+    intervalMs: number,
+    fps: number,
+    maxFrames: number,
+    useCuda: boolean,
+    progress: { frames: number },
+    keyframesOnly: boolean,
+  ): AsyncGenerator<{ timestampMs: number; buffer: Buffer }> {
+    const scale = "scale=w='max(2,trunc(min(1080,iw*sar)/2)*2)':h='max(2,trunc(ih*min(1,1080/(iw*sar))/2)*2)',setsar=1";
+    // Sample first, then scale, so only the frames that are actually used get resized.
+    const filter = `${useCuda ? 'hwdownload,format=nv12,' : ''}fps=${fps},${scale}`;
+    // Bound decoder threads: many videos are sampled at once, and an unbounded decoder thread count per
+    // process exhausts the container's thread/PID budget.
+    const inputOptions: string[] = ['-threads', '2'];
+    if (useCuda) {
+      inputOptions.push('-hwaccel_output_format', 'cuda', '-hwaccel', 'cuda');
+    }
+    if (keyframesOnly) {
+      // Sampling every N seconds does not need every frame: decoding only key frames cuts the pass to
+      // about a third. The `fps` filter still emits on the exact sampling grid, so timestamps stay true.
+      inputOptions.push('-skip_frame', 'nokey');
+    }
+
+    const output = new PassThrough();
+    let failure: Error | undefined;
+    const outputOptions = ['-map 0:v:0', '-an', '-sn', `-vf ${filter}`];
+    if (maxFrames > 0) {
+      outputOptions.push('-frames:v', String(maxFrames));
+    }
+    outputOptions.push('-f', 'image2pipe', '-c:v', 'mjpeg', '-q:v', '2');
+
+    const command = ffmpeg(input, { niceness: 10, timeout: 1800 })
+      .inputOptions(inputOptions)
+      .outputOptions(outputOptions)
+      .output(output)
+      .on('error', (error: Error) => {
+        failure = error;
+        output.destroy();
+      });
+    command.run();
+
+    const splitter = new JpegFrameSplitter();
+    let index = 0;
+    try {
+      for await (const chunk of output) {
+        for (const buffer of splitter.push(chunk as Buffer)) {
+          progress.frames++;
+          yield { timestampMs: index++ * intervalMs, buffer };
+          if (maxFrames > 0 && index >= maxFrames) {
+            return;
+          }
+        }
+      }
+    } finally {
+      // Stop decoding as soon as the consumer is done: frame cap reached, job cancelled, or error.
+      if (isProcessRunning(command)) {
+        command.kill('SIGKILL');
+      }
+      output.destroy();
+    }
+
+    if (progress.frames === 0) {
+      // Never report success with nothing decoded: the job must be retried and stay visible instead of
+      // silently recording "no faces" for a video that was never looked at.
+      throw failure ?? new Error(`Video frame stream produced no frames for ${input}`);
+    }
+  }
+
+  private async runVideoFaceFrame(input: string, timestampMs: number, useCuda: boolean): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    const output = new Writable({
+      write(chunk: Buffer, _encoding, callback) {
+        chunks.push(chunk);
+        callback();
+      },
+    });
+    const scale = "scale=w='max(2,trunc(min(1080,iw*sar)/2)*2)':h='max(2,trunc(ih*min(1,1080/(iw*sar))/2)*2)',setsar=1";
+    const inputOptions = ['-ss', String(timestampMs / 1000)];
+    if (useCuda) {
+      // Decode on the GPU, then download the single frame before the CPU-side scaling and JPEG encode.
+      inputOptions.unshift('-hwaccel_output_format', 'cuda', '-hwaccel', 'cuda');
+    }
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(input, { niceness: 10, timeout: 120 })
+        .inputOptions(inputOptions)
+        .outputOptions([
+          '-map 0:v:0',
+          '-frames:v 1',
+          '-an',
+          '-sn',
+          `-vf ${useCuda ? 'hwdownload,format=nv12,' : ''}${scale}`,
+          '-f image2pipe',
+          '-c:v mjpeg',
+          '-q:v 2',
+        ])
+        .output(output)
+        .on('error', reject)
+        .on('end', () => resolve())
+        .run();
+    });
+    const buffer = Buffer.concat(chunks);
+    if (buffer.length === 0) {
+      throw new Error(`No video frame at ${timestampMs}ms`);
+    }
+    return buffer;
+  }
+
+  /** Bounded mono PCM16 LE for ASR. No original-file writes and no full-video audio buffering. */
+  async extractTranscriptionAudio(
+    input: string,
+    chunk: TranscriptionChunk,
+    audioStreamIndex: number,
+    signal?: AbortSignal,
+  ): Promise<Buffer> {
+    validateTranscriptionChunk(chunk);
+    if (!Number.isSafeInteger(audioStreamIndex) || audioStreamIndex < 0) {
+      throw new Error('Invalid transcription audio stream');
+    }
+    signal?.throwIfAborted();
+    const maxBytes = Math.ceil((chunk.durationMs / 1000) * TRANSCRIPTION_SAMPLE_RATE) * 2;
+    const buffers: Buffer[] = [];
+    let size = 0;
+    const output = new Writable({
+      write(buffer: Buffer, _encoding, callback) {
+        size += buffer.length;
+        if (size > maxBytes) {
+          callback(new Error('Transcription audio exceeded chunk limit'));
+          return;
+        }
+        buffers.push(buffer);
+        callback();
+      },
+    });
+    const command = ffmpeg(input, { niceness: 10, timeout: 120 })
+      .inputOptions(['-ss', String(chunk.startMs / 1000)])
+      .outputOptions([
+        `-map 0:${audioStreamIndex}`,
+        '-vn',
+        '-sn',
+        '-dn',
+        '-threads 1',
+        '-ac 1',
+        `-ar ${TRANSCRIPTION_SAMPLE_RATE}`,
+        // Preserve audio delays as silence instead of moving speech to the beginning of the window.
+        `-af aresample=${TRANSCRIPTION_SAMPLE_RATE}:async=1:first_pts=0`,
+        `-t ${chunk.durationMs / 1000}`,
+        '-c:a pcm_s16le',
+        '-f s16le',
+      ])
+      .output(output);
+    const abort = () => {
+      if (isProcessRunning(command)) {
+        command.kill('SIGKILL');
+      }
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        command
+          .on('start', () => {
+            // Cancellation can arrive while fluent-ffmpeg resolves executable capabilities before spawning.
+            if (signal?.aborted) {
+              abort();
+            }
+          })
+          .on('error', reject)
+          .on('end', () => resolve())
+          .run();
+      });
+      signal?.throwIfAborted();
+      return Buffer.concat(buffers, size);
+    } finally {
+      signal?.removeEventListener('abort', abort);
+      output.destroy();
+    }
   }
 
   transcode(input: string, output: string | Writable, options: TranscodeCommand): Promise<void> {

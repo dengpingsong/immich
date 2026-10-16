@@ -26,7 +26,7 @@ export enum ModelType {
   OCR = 'ocr',
 }
 
-export type ModelPayload = { imagePath: string } | { text: string };
+export type ModelPayload = { imagePath: string | Buffer } | { text: string };
 
 type ModelOptions = { modelName: string };
 
@@ -159,14 +159,29 @@ export class MachineLearningRepository {
     return this.healthyMap[url];
   }
 
+  /** A model task may run on a different worker than the others (for example a GPU beside an NPU). */
+  private getUrls(config: MachineLearningRequest): string[] {
+    const isClip = ModelTask.SEARCH in config;
+    const isFacialRecognition = ModelTask.FACIAL_RECOGNITION in config;
+    const urls = isClip
+      ? this.config.clipUrls.length > 0
+        ? this.config.clipUrls
+        : this.config.urls
+      : isFacialRecognition && this.config.facialRecognitionUrls.length > 0
+        ? this.config.facialRecognitionUrls
+        : this.config.urls;
+    const candidates = urls;
+    return [
+      // try healthy servers first
+      ...candidates.filter((url) => this.isHealthy(url)),
+      ...candidates.filter((url) => !this.isHealthy(url)),
+    ];
+  }
+
   private async predict<T>(payload: ModelPayload, config: MachineLearningRequest): Promise<T> {
     const formData = await this.getFormData(payload, config);
 
-    for (const url of [
-      // try healthy servers first
-      ...this.config.urls.filter((url) => this.isHealthy(url)),
-      ...this.config.urls.filter((url) => !this.isHealthy(url)),
-    ]) {
+    for (const url of this.getUrls(config)) {
       try {
         const response = await fetch(new URL('predict', url), { method: 'POST', body: formData });
         if (response.ok) {
@@ -187,7 +202,7 @@ export class MachineLearningRepository {
     throw new Error(`Machine learning request '${JSON.stringify(config)}' failed for all URLs`);
   }
 
-  async detectFaces(imagePath: string, { modelName, minScore }: FaceDetectionOptions) {
+  async detectFaces(imagePath: string | Buffer, { modelName, minScore }: FaceDetectionOptions) {
     const request = {
       [ModelTask.FACIAL_RECOGNITION]: {
         [ModelType.DETECTION]: { modelName, options: { minScore } },
@@ -230,7 +245,7 @@ export class MachineLearningRepository {
     formData.append('entries', JSON.stringify(config));
 
     if ('imagePath' in payload) {
-      const fileBuffer = await readFile(payload.imagePath);
+      const fileBuffer = Buffer.isBuffer(payload.imagePath) ? payload.imagePath : await readFile(payload.imagePath);
       formData.append('image', new Blob([new Uint8Array(fileBuffer)]));
     } else if ('text' in payload) {
       formData.append('text', payload.text);

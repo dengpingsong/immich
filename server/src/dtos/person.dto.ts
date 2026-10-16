@@ -103,6 +103,23 @@ export const AssetFaceResponseSchema = z
     boundingBoxY1: z.int().describe('Bounding box Y1 coordinate'),
     boundingBoxY2: z.int().describe('Bounding box Y2 coordinate'),
     sourceType: SourceTypeSchema.optional(),
+    sourceAssetId: z.uuidv4().nullable().optional().describe('Source video asset for temporal face detections'),
+    timestampMs: z.int().min(0).nullable().optional().describe('Representative frame seek time in milliseconds'),
+    appearances: z
+      .array(
+        z
+          .object({
+            timestampMs: z.int().min(0),
+            imageWidth: z.int().positive(),
+            imageHeight: z.int().positive(),
+            boundingBoxX1: z.int(),
+            boundingBoxY1: z.int(),
+            boundingBoxX2: z.int(),
+            boundingBoxY2: z.int(),
+          })
+          .meta({ id: 'FaceAppearanceDto' }),
+      )
+      .optional(),
     person: PersonResponseSchema.nullable(),
   })
   .describe('Asset face with person')
@@ -200,9 +217,14 @@ function mapFacesWithoutPerson(
         imageWidth: face.imageWidth,
         imageHeight: face.imageHeight,
       },
-      edits ?? [],
-      assetDimensions ?? { width: face.imageWidth, height: face.imageHeight },
+      face.timestampMs == null ? (edits ?? []) : [],
+      face.timestampMs == null
+        ? (assetDimensions ?? { width: face.imageWidth, height: face.imageHeight })
+        : { width: face.imageWidth, height: face.imageHeight },
     ),
+    sourceAssetId: face.sourceAssetId ?? null,
+    timestampMs: face.timestampMs ?? null,
+    appearances: face.sourceAssetId ? (face.appearances ?? []) : [],
     sourceType: face.sourceType,
   };
 }

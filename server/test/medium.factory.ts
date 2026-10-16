@@ -46,6 +46,8 @@ import { MemoryRepository } from 'src/repositories/memory.repository';
 import { MetadataRepository } from 'src/repositories/metadata.repository';
 import { NotificationRepository } from 'src/repositories/notification.repository';
 import { OcrRepository } from 'src/repositories/ocr.repository';
+import { SubtitleRepository } from 'src/repositories/subtitle.repository';
+import { TranscriptionRepository } from 'src/repositories/transcription.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { PluginRepository } from 'src/repositories/plugin.repository';
@@ -483,6 +485,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case LibraryRepository:
     case NotificationRepository:
     case OcrRepository:
+    case SubtitleRepository:
     case PartnerRepository:
     case PersonRepository:
     case SearchRepository:
@@ -513,7 +516,8 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     }
 
     case MediaRepository:
-    case MetadataRepository: {
+    case MetadataRepository:
+    case TranscriptionRepository: {
       return new key(LoggingRepository.create()) as InstanceType<T>;
     }
 
@@ -552,6 +556,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case IntegrityRepository:
     case NotificationRepository:
     case OcrRepository:
+    case SubtitleRepository:
     case PartnerRepository:
     case PersonRepository:
     case SessionRepository:

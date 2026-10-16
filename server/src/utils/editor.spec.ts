@@ -55,6 +55,9 @@ describe('boundingBoxOverlap', () => {
 });
 
 const createFace = (params: Partial<AssetFace> = {}): AssetFace => ({
+  sourceAssetId: null,
+  timestampMs: null,
+  appearances: [],
   id: 'face-id',
   deletedAt: null,
   assetId: 'asset-id',

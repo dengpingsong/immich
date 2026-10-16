@@ -202,6 +202,8 @@ export class MetadataService extends BaseService {
     ]);
 
     await this.eventRepository.emit('AssetHide', { assetId: motionAsset.id, userId: motionAsset.ownerId });
+    // The still may already have completed face detection before its motion file arrived.
+    await this.jobRepository.queue({ name: JobName.AssetDetectFaces, data: { id: photoAsset.id } });
   }
 
   private isOrientationSidewards(orientation: ExifOrientation | number): boolean {

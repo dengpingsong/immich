@@ -826,6 +826,7 @@ export enum QueueName {
   Notification = 'notifications',
   BackupDatabase = 'backupDatabase',
   Ocr = 'ocr',
+  Transcription = 'transcription',
   Workflow = 'workflow',
   IntegrityCheck = 'integrityCheck',
   Editor = 'editor',
@@ -920,6 +921,8 @@ export enum JobName {
   // OCR
   OcrQueueAll = 'OcrQueueAll',
   Ocr = 'Ocr',
+  TranscriptionQueueAll = 'TranscriptionQueueAll',
+  Transcription = 'AssetTranscription',
 
   // Workflow
   WorkflowAssetTrigger = 'WorkflowAssetTrigger',

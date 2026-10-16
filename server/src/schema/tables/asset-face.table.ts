@@ -16,6 +16,7 @@ import { asset_face_source_type } from 'src/schema/enums';
 import { asset_face_audit } from 'src/schema/functions';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table';
+import type { FaceAppearance } from 'src/utils/video-face';
 
 @Table({ name: 'asset_face' })
 @UpdatedAtTrigger('asset_face_updatedAt')
@@ -53,6 +54,15 @@ export class AssetFaceTable {
     index: false,
   })
   personGroupId!: string | null;
+
+  @ForeignKeyColumn(() => AssetTable, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  sourceAssetId!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  timestampMs!: number | null;
+
+  @Column({ type: 'jsonb', default: [] })
+  appearances!: Generated<FaceAppearance[]>;
 
   @Column({ default: 0, type: 'integer' })
   imageWidth!: Generated<number>;

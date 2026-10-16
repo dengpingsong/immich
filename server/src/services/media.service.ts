@@ -403,7 +403,12 @@ export class MediaService extends BaseService {
 
     const { x1, y1, x2, y2, oldWidth, oldHeight, exifOrientation, previewPath, originalPath } = data;
     let inputImage: string | Buffer;
-    if (data.type === AssetType.Video) {
+    if (data.timestampMs != null) {
+      if (!data.sourceAssetId || !data.sourcePath) {
+        return JobStatus.Failed;
+      }
+      inputImage = await this.mediaRepository.extractVideoFaceFrame(data.sourcePath, data.timestampMs);
+    } else if (data.type === AssetType.Video) {
       if (!previewPath) {
         this.logger.error(`Could not generate person thumbnail for video ${personGroupId}: missing preview path`);
         return JobStatus.Failed;
@@ -420,7 +425,10 @@ export class MediaService extends BaseService {
       colorspace: image.colorspace,
       processInvalidImages: process.env.IMMICH_PROCESS_INVALID_IMAGES === 'true',
       // if this is an extracted image, it may not have orientation metadata
-      orientation: Buffer.isBuffer(inputImage) && exifOrientation ? Number(exifOrientation) : undefined,
+      orientation:
+        data.timestampMs == null && Buffer.isBuffer(inputImage) && exifOrientation
+          ? Number(exifOrientation)
+          : undefined,
     });
 
     const thumbnailPath = StorageCore.getPersonThumbnailPath({ ownerId, personGroupId });
@@ -837,7 +845,11 @@ export class MediaService extends BaseService {
     const assetFaces = await this.personRepository.getFaces(asset.id, { viewingUserId: asset.ownerId });
     const ocrData = await this.ocrRepository.getByAssetId(asset.id, {});
 
-    const faceStatuses = checkFaceVisibility(assetFaces, originalDimensions, cropBox);
+    const faceStatuses = checkFaceVisibility(
+      assetFaces.filter((face) => !face.appearances?.length),
+      originalDimensions,
+      cropBox,
+    );
     await this.personRepository.updateVisibility(faceStatuses.visible, faceStatuses.hidden);
 
     const ocrStatuses = checkOcrVisibility(ocrData, originalDimensions, cropBox);

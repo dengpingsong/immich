@@ -18,6 +18,28 @@ const PUBLIC_PROPERTIES = [
   'theme.customCss',
 ];
 
+describe('video face sampling configuration', () => {
+  it('requires explicit opt-in by default', () => {
+    expect(defaults.machineLearning.facialRecognition.videoFaces.enabled).toBe(false);
+    expect(defaults.machineLearning.facialRecognition.videoFaces.maxFrames).toBe(0);
+  });
+
+  it.each([
+    { intervalMs: 0 },
+    { intervalMs: 60_001 },
+    { livePhotoIntervalMs: 99 },
+    { maxFrames: -1 },
+    { maxFrames: 301 },
+    { maxFrames: 1.5 },
+    { minSimilarity: -0.01 },
+    { minSimilarity: 1.01 },
+  ])('rejects unsafe sampling limits: %j', (invalid) => {
+    const config = structuredClone(defaults);
+    Object.assign(config.machineLearning.facialRecognition.videoFaces, invalid);
+    expect(AdminConfigDto.schema.safeParse(config).success).toBe(false);
+  });
+});
+
 describe('config visibility', () => {
   it('should expose every property to admins', () => {
     const paths = getKeysDeep(defaults);

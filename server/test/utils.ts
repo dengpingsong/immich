@@ -49,6 +49,8 @@ import { MoveRepository } from 'src/repositories/move.repository';
 import { NotificationRepository } from 'src/repositories/notification.repository';
 import { OAuthRepository } from 'src/repositories/oauth.repository';
 import { OcrRepository } from 'src/repositories/ocr.repository';
+import { SubtitleRepository } from 'src/repositories/subtitle.repository';
+import { TranscriptionRepository } from 'src/repositories/transcription.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { PluginRepository } from 'src/repositories/plugin.repository';
@@ -263,6 +265,8 @@ export type ServiceOverrides = {
   move: MoveRepository;
   notification: NotificationRepository;
   ocr: OcrRepository;
+  subtitle: SubtitleRepository;
+  transcription: TranscriptionRepository;
   oauth: OAuthRepository;
   partner: PartnerRepository;
   person: PersonRepository;
@@ -349,6 +353,8 @@ export const getMocks = () => {
     move: automock(MoveRepository, { strict: false }),
     notification: automock(NotificationRepository),
     ocr: automock(OcrRepository, { strict: false }),
+    subtitle: automock(SubtitleRepository, { strict: false }),
+    transcription: automock(TranscriptionRepository, { args: [loggerMock] }),
     oauth: automock(OAuthRepository, { args: [loggerMock] }),
     partner: automock(PartnerRepository, { strict: false }),
     person: automock(PersonRepository, { strict: false }),
@@ -424,6 +430,8 @@ export const newTestService = <T extends BaseService>(
     overrides.notification || (mocks.notification as As<NotificationRepository>),
     overrides.oauth || (mocks.oauth as As<OAuthRepository>),
     overrides.ocr || (mocks.ocr as As<OcrRepository>),
+    overrides.subtitle || (mocks.subtitle as As<SubtitleRepository>),
+    overrides.transcription || (mocks.transcription as As<TranscriptionRepository>),
     overrides.partner || (mocks.partner as As<PartnerRepository>),
     overrides.person || (mocks.person as As<PersonRepository>),
     overrides.plugin || (mocks.plugin as As<PluginRepository>),
