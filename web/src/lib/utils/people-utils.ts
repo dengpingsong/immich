@@ -9,6 +9,9 @@ export const getBoundingBox = (faces: Faces[], imageSize: Size): BoundingBox[] =
   const boxes: BoundingBox[] = [];
 
   for (const face of faces) {
+    if (typeof face.timestampMs === 'number') {
+      continue;
+    }
     const rect = mapNormalizedRectToContent(
       { x: face.boundingBoxX1 / face.imageWidth, y: face.boundingBoxY1 / face.imageHeight },
       { x: face.boundingBoxX2 / face.imageWidth, y: face.boundingBoxY2 / face.imageHeight },
@@ -27,6 +30,11 @@ export const zoomImageToBase64 = async (
   assetType: AssetTypeEnum,
   photoViewer: HTMLImageElement | undefined,
 ): Promise<string | null> => {
+  // Never crop a still preview using coordinates from a different video frame.
+  // Assigned faces use their server-generated representative thumbnail instead.
+  if (typeof face.timestampMs === 'number') {
+    return null;
+  }
   let image: HTMLImageElement | undefined;
   if (assetType === AssetTypeEnum.Image) {
     image = photoViewer;

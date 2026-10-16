@@ -142,13 +142,39 @@
     return () => loader.destroy();
   });
 
+  // `asset.width/height` are not always populated, and external-library photos (HEIC in particular)
+  // report their sensor size plus an orientation tag instead of the upright size. Falling straight back
+  // to 1x1 made the viewer lay the picture out in a square box and stretch it.
+  let measuredDimensions = $state<Size>();
+
   const imageDimensions = $derived.by(() => {
+    if (measuredDimensions && measuredDimensions.width > 0 && measuredDimensions.height > 0) {
+      return measuredDimensions;
+    }
     const { width, height } = asset;
     if (width && width > 0 && height && height > 0) {
       return { width, height };
     }
+    const exifWidth = asset.exifInfo?.exifImageWidth;
+    const exifHeight = asset.exifInfo?.exifImageHeight;
+    if (exifWidth && exifHeight) {
+      const orientation = Number(asset.exifInfo?.orientation ?? 1);
+      // Orientations 5-8 rotate the stored pixels by 90 degrees, so the reported size is transposed.
+      const swapForOrientation = Number.isFinite(orientation) && orientation >= 5;
+      return swapForOrientation ? { width: exifHeight, height: exifWidth } : { width: exifWidth, height: exifHeight };
+    }
     return { width: 1, height: 1 };
   });
+
+  /** The decoded picture is the ground truth: it is already upright after orientation handling. */
+  const measureElement = (element: HTMLImageElement | undefined) => {
+    if (!element) {
+      return;
+    }
+    if (element.naturalWidth > 0 && element.naturalHeight > 0) {
+      measuredDimensions = { width: element.naturalWidth, height: element.naturalHeight };
+    }
+  };
 
   const { insetInlineStart, top, displayWidth, displayHeight, rasterWidth, rasterHeight, rasterScale } = $derived.by(
     () => {
@@ -216,6 +242,29 @@
       (quality.original === 'success' ? originalElement : undefined) ??
       (quality.preview === 'success' ? previewElement : undefined) ??
       (quality.thumbnail === 'success' ? thumbnailElement : undefined);
+  });
+
+  $effect(() => {
+    // Re-measure whenever a layer becomes available: the box must match the picture that is on screen.
+    // Bound element refs are `null` while unmounted, not only `undefined`.
+    const elements = [originalElement, previewElement, thumbnailElement].filter(
+      (element): element is HTMLImageElement => element !== undefined && element !== null,
+    );
+    const cleanups: (() => void)[] = [];
+    for (const element of elements) {
+      if (element.complete) {
+        measureElement(element);
+        continue;
+      }
+      const onLoad = () => measureElement(element);
+      element.addEventListener('load', onLoad);
+      cleanups.push(() => element.removeEventListener('load', onLoad));
+    }
+    return () => {
+      for (const cleanup of cleanups) {
+        cleanup();
+      }
+    };
   });
 </script>
 

@@ -1,6 +1,7 @@
+import { AssetTypeEnum, type AssetFaceResponseDto } from '@immich/sdk';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
 import type { Size } from '$lib/utils/container-utils';
-import { getBoundingBox } from '$lib/utils/people-utils';
+import { getBoundingBox, zoomImageToBase64 } from '$lib/utils/people-utils';
 
 const makeFace = (overrides: Partial<Faces> = {}): Faces => ({
   id: 'face-1',
@@ -14,6 +15,22 @@ const makeFace = (overrides: Partial<Faces> = {}): Faces => ({
 });
 
 describe('getBoundingBox', () => {
+  it('excludes temporal representatives, including the zero timestamp', () => {
+    const faces = [
+      makeFace({ timestampMs: 0 }),
+      makeFace({ timestampMs: 2500 }),
+      makeFace({ id: 'still', timestampMs: null }),
+    ];
+    expect(getBoundingBox(faces, { width: 800, height: 600 }).map((box) => box.id)).toEqual(['still']);
+  });
+
+  it.each([AssetTypeEnum.Image, AssetTypeEnum.Video])(
+    'does not crop a temporal face from a %s preview',
+    async (type) => {
+      const face: AssetFaceResponseDto = { ...makeFace({ timestampMs: 0 }), person: null };
+      await expect(zoomImageToBase64(face, 'asset', type, undefined)).resolves.toBeNull();
+    },
+  );
   it('should scale face coordinates to display dimensions', () => {
     const face = makeFace();
     const imageSize: Size = { width: 800, height: 600 };

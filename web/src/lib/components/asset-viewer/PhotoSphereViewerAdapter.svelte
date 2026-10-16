@@ -56,7 +56,7 @@
   let animationInProgress: { cancel: () => void } | undefined;
 
   $effect(() => {
-    const faces: Faces[] = assetViewerManager.highlightedFaces;
+    const faces: Faces[] = assetViewerManager.highlightedFaces.filter((face) => typeof face.timestampMs !== 'number');
 
     if (animationInProgress) {
       animationInProgress.cancel();

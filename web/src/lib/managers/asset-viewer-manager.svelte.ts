@@ -9,6 +9,8 @@ import { BaseEventManager } from '$lib/utils/base-event-manager.svelte';
 import type { AssetGridRouteSearchParams } from '$lib/utils/navigation';
 
 export interface Faces {
+  /** Temporal coordinates belong to a sampled video frame, not the static preview. */
+  timestampMs?: number | null;
   id: string;
   imageHeight: number;
   imageWidth: number;
@@ -55,7 +57,10 @@ class AssetViewerManager extends BaseEventManager<Events> {
   #isEditFacesPanelOpen = $state(false);
   #viewingAssetStoreState = $state<AssetResponseDto>();
   #viewState = $state<boolean>(false);
-  #highlightedFaces = $state<Faces[]>([]);
+  #hoveredFaces = $state<Faces[]>([]);
+  #selectedFaces = $state<Faces[]>([]);
+  #hoveredMarkers = $state<number[]>([]);
+  #selectedMarkers = $state<number[]>([]);
   #showingHiddenPeople = $state(false);
   gridScrollTarget = $state<AssetGridRouteSearchParams | null | undefined>();
 
@@ -221,16 +226,57 @@ class AssetViewerManager extends BaseEventManager<Events> {
     this.closeEditFacesPanel();
   }
 
+  // Hovering a portrait is transient, while clicking one selects it until something else is selected.
+  // Both used to share a single value, so the viewer clearing its hover highlight (on pointer leave) also
+  // wiped the person the user had just clicked. Hover wins while it lasts, the selection is the fallback.
   get highlightedFaces() {
-    return this.#highlightedFaces;
+    return this.#hoveredFaces.length > 0 ? this.#hoveredFaces : this.#selectedFaces;
   }
 
+  /** Transient highlight, used for hover. */
   setHighlightedFaces(faces: Faces[]) {
-    this.#highlightedFaces = faces;
+    this.#hoveredFaces = faces;
   }
 
+  /** Sticky selection, used for clicks and keyboard focus. */
+  selectFaces(faces: Faces[]) {
+    this.#selectedFaces = faces;
+  }
+
+  get selectedFaces() {
+    return this.#selectedFaces;
+  }
+
+  /** Clears only the transient highlight, so a clicked person stays highlighted. */
   clearHighlightedFaces() {
-    this.#highlightedFaces = [];
+    this.#hoveredFaces = [];
+  }
+
+  clearSelectedFaces() {
+    this.#selectedFaces = [];
+    this.#hoveredFaces = [];
+  }
+
+  /** Sample instants of the highlighted person, drawn as marks on the native seek range. */
+  get faceSampleMarkers() {
+    return this.#hoveredMarkers.length > 0 ? this.#hoveredMarkers : this.#selectedMarkers;
+  }
+
+  setFaceSampleMarkers(timestamps: number[]) {
+    this.#hoveredMarkers = timestamps;
+  }
+
+  selectFaceSampleMarkers(timestamps: number[]) {
+    this.#selectedMarkers = timestamps;
+  }
+
+  clearFaceSampleMarkers() {
+    this.#hoveredMarkers = [];
+  }
+
+  clearSelectedFaceSampleMarkers() {
+    this.#selectedMarkers = [];
+    this.#hoveredMarkers = [];
   }
 
   get isShowingHiddenPeople() {

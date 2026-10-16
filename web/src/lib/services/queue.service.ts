@@ -20,6 +20,7 @@ import {
   mdiFolderMove,
   mdiImageSearch,
   mdiLibraryShelves,
+  mdiClosedCaptionOutline,
   mdiOcr,
   mdiPause,
   mdiPencil,
@@ -207,6 +208,11 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       icon: mdiOcr,
       title: $t('admin.machine_learning_ocr'),
       subtitle: $t('admin.ocr_job_description'),
+    },
+    [QueueName.Transcription]: {
+      icon: mdiClosedCaptionOutline,
+      title: $t('video_transcription_enabled'),
+      subtitle: $t('video_transcription_description'),
     },
     [QueueName.VideoConversion]: {
       icon: mdiVideo,

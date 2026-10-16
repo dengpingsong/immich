@@ -255,6 +255,113 @@
       </SettingAccordion>
 
       <SettingAccordion
+        key="video-face"
+        title={$t('video_face_sampling_enabled')}
+        subtitle={$t('video_face_sampling_description')}
+      >
+        <div class="ms-4 mt-4 flex flex-col gap-4">
+          <SettingSwitch
+            title={$t('video_face_sampling_enabled')}
+            subtitle={$t('video_face_sampling_description')}
+            bind:checked={configToEdit.machineLearning.facialRecognition.videoFaces.enabled}
+            disabled={disabled ||
+              !configToEdit.machineLearning.enabled ||
+              !configToEdit.machineLearning.facialRecognition.enabled}
+            isEdited={configToEdit.machineLearning.facialRecognition.videoFaces.enabled !==
+              config.machineLearning.facialRecognition.videoFaces.enabled}
+          />
+          {#each [{ key: 'intervalMs', label: 'video_face_interval', min: 100, max: 60_000, step: '100' }, { key: 'livePhotoIntervalMs', label: 'video_face_live_photo_interval', min: 100, max: 10_000, step: '100' }, { key: 'maxFrames', label: 'video_face_max_frames', min: 0, max: 300, step: '1' }, { key: 'minSimilarity', label: 'video_face_min_similarity', min: 0, max: 1, step: '0.01' }] as const as field (field.key)}
+            <SettingInputField
+              inputType={SettingInputFieldType.NUMBER}
+              label={$t(field.label)}
+              bind:value={configToEdit.machineLearning.facialRecognition.videoFaces[field.key]}
+              min={field.min}
+              max={field.max}
+              step={field.step}
+              disabled={disabled ||
+                !configToEdit.machineLearning.enabled ||
+                !configToEdit.machineLearning.facialRecognition.enabled ||
+                !configToEdit.machineLearning.facialRecognition.videoFaces.enabled}
+              isEdited={configToEdit.machineLearning.facialRecognition.videoFaces[field.key] !==
+                config.machineLearning.facialRecognition.videoFaces[field.key]}
+            />
+          {/each}
+        </div>
+      </SettingAccordion>
+
+      <SettingAccordion
+        key="transcription"
+        title={$t('video_transcription_enabled')}
+        subtitle={$t('video_transcription_description')}
+      >
+        <div class="ms-4 mt-4 flex flex-col gap-4">
+          <SettingSwitch
+            title={$t('video_transcription_enabled')}
+            subtitle={$t('video_transcription_description')}
+            bind:checked={configToEdit.machineLearning.transcription.enabled}
+            disabled={disabled || !configToEdit.machineLearning.enabled}
+            isEdited={configToEdit.machineLearning.transcription.enabled !==
+              config.machineLearning.transcription.enabled}
+          />
+          <SettingInputField
+            inputType={SettingInputFieldType.TEXT}
+            label={$t('video_transcription_url')}
+            bind:value={configToEdit.machineLearning.transcription.url}
+            disabled={disabled ||
+              !configToEdit.machineLearning.enabled ||
+              !configToEdit.machineLearning.transcription.enabled}
+            isEdited={configToEdit.machineLearning.transcription.url !== config.machineLearning.transcription.url}
+          />
+          <SettingInputField
+            inputType={SettingInputFieldType.TEXT}
+            label={$t('video_transcription_api_key')}
+            description={$t('video_transcription_api_key_description')}
+            bind:value={configToEdit.machineLearning.transcription.apiKey}
+            disabled={disabled ||
+              !configToEdit.machineLearning.enabled ||
+              !configToEdit.machineLearning.transcription.enabled}
+            isEdited={configToEdit.machineLearning.transcription.apiKey !== config.machineLearning.transcription.apiKey}
+          />
+          <SettingInputField
+            inputType={SettingInputFieldType.TEXT}
+            label={$t('video_transcription_model')}
+            bind:value={configToEdit.machineLearning.transcription.modelName}
+            disabled={disabled ||
+              !configToEdit.machineLearning.enabled ||
+              !configToEdit.machineLearning.transcription.enabled}
+            isEdited={configToEdit.machineLearning.transcription.modelName !==
+              config.machineLearning.transcription.modelName}
+          />
+          <SettingInputField
+            inputType={SettingInputFieldType.TEXT}
+            label={$t('video_transcription_language')}
+            description={$t('video_transcription_language_description')}
+            bind:value={configToEdit.machineLearning.transcription.language}
+            disabled={disabled ||
+              !configToEdit.machineLearning.enabled ||
+              !configToEdit.machineLearning.transcription.enabled}
+            isEdited={configToEdit.machineLearning.transcription.language !==
+              config.machineLearning.transcription.language}
+          />
+          {#each [{ key: 'maxChunkMs', label: 'video_transcription_max_chunk', min: 5000, max: 32_000, step: '1000' }, { key: 'noSpeechThreshold', label: 'video_transcription_no_speech_threshold', min: 0, max: 1, step: '0.01' }] as const as field (field.key)}
+            <SettingInputField
+              inputType={SettingInputFieldType.NUMBER}
+              label={$t(field.label)}
+              bind:value={configToEdit.machineLearning.transcription[field.key]}
+              min={field.min}
+              max={field.max}
+              step={field.step}
+              disabled={disabled ||
+                !configToEdit.machineLearning.enabled ||
+                !configToEdit.machineLearning.transcription.enabled}
+              isEdited={configToEdit.machineLearning.transcription[field.key] !==
+                config.machineLearning.transcription[field.key]}
+            />
+          {/each}
+        </div>
+      </SettingAccordion>
+
+      <SettingAccordion
         key="ocr"
         title={$t('admin.machine_learning_ocr')}
         subtitle={$t('admin.machine_learning_ocr_description')}

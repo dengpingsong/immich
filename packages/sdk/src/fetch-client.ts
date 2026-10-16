@@ -177,6 +177,7 @@ export type AdminConfigJobDto = {
     sidecar: AdminConfigJobSettingsDto;
     smartSearch: AdminConfigJobSettingsDto;
     thumbnailGeneration: AdminConfigJobSettingsDto;
+    transcription: AdminConfigJobSettingsDto;
     videoConversion: AdminConfigJobSettingsDto;
     workflow: AdminConfigJobSettingsDto;
 };
@@ -217,6 +218,18 @@ export type AdminConfigDuplicateDetectionDto = {
     /** Maximum distance threshold for duplicate detection */
     maxDistance: number;
 };
+export type AdminConfigVideoFacesDto = {
+    /** Enable multi-frame video and Live Photo face detection */
+    enabled: boolean;
+    /** Video sampling interval in milliseconds */
+    intervalMs: number;
+    /** Live Photo sampling interval in milliseconds */
+    livePhotoIntervalMs: number;
+    /** Optional maximum sampled frames per video; 0 means unlimited */
+    maxFrames: number;
+    /** Minimum cosine similarity for within-asset face deduplication */
+    minSimilarity: number;
+};
 export type AdminConfigFacialRecognitionDto = {
     /** Whether the task is enabled */
     enabled: boolean;
@@ -228,6 +241,7 @@ export type AdminConfigFacialRecognitionDto = {
     minScore: number;
     /** Name of the model to use */
     modelName: string;
+    videoFaces: AdminConfigVideoFacesDto;
 };
 export type AdminConfigOcrDto = {
     /** Whether the task is enabled */
@@ -241,6 +255,22 @@ export type AdminConfigOcrDto = {
     /** Name of the model to use */
     modelName: string;
 };
+export type AdminConfigTranscriptionDto = {
+    /** Shared secret sent to the transcription worker */
+    apiKey: string;
+    /** Enable automatic video subtitles via a Whisper-compatible transcription worker */
+    enabled: boolean;
+    /** Optional source language hint (empty = detect the original language per chunk) */
+    language: string;
+    /** Audio window sent to the worker per request, in milliseconds */
+    maxChunkMs: number;
+    /** Transcription model label reported by the worker */
+    modelName: string;
+    /** Discard cues whose no-speech probability is at least this value */
+    noSpeechThreshold: number;
+    /** Transcription worker URL (internal, never exposed to browsers) */
+    url: string;
+};
 export type AdminConfigMachineLearningDto = {
     availabilityChecks: AdminConfigMachineLearningAvailabilityChecksDto;
     clip: AdminConfigClipDto;
@@ -249,6 +279,7 @@ export type AdminConfigMachineLearningDto = {
     enabled: boolean;
     facialRecognition: AdminConfigFacialRecognitionDto;
     ocr: AdminConfigOcrDto;
+    transcription: AdminConfigTranscriptionDto;
     /** ML service URLs */
     urls: string[];
 };
@@ -1413,6 +1444,24 @@ export type AssetOcrResponseDto = {
     /** Normalized y coordinate of box corner 4 (0-1) */
     y4: number;
 };
+export type AssetSubtitleResponseDto = {
+    /** Asset this transcript belongs to */
+    assetId: string;
+    /** Number of subtitle cues */
+    cueCount: number;
+    /** Cues discarded because the model reported silence */
+    droppedCueCount: number;
+    /** Detected or configured language of the transcript */
+    language: string;
+    /** Model that produced the transcript */
+    modelName: string;
+    /** When the transcript was last generated */
+    updatedAt: string;
+};
+export type AssetSubtitleGenerateResponseDto = {
+    /** Whether a transcription job was queued */
+    queued: boolean;
+};
 export type SignUpDto = {
     /** User email */
     email: string;
@@ -1671,7 +1720,17 @@ export type DuplicateResolveDto = {
     /** List of duplicate groups to resolve */
     groups: DuplicateResolveGroupDto[];
 };
+export type FaceAppearanceDto = {
+    boundingBoxX1: number;
+    boundingBoxX2: number;
+    boundingBoxY1: number;
+    boundingBoxY2: number;
+    imageHeight: number;
+    imageWidth: number;
+    timestampMs: number;
+};
 export type AssetFaceResponseDto = {
+    appearances?: FaceAppearanceDto[];
     /** Bounding box X1 coordinate */
     boundingBoxX1: number;
     /** Bounding box X2 coordinate */
@@ -1687,7 +1746,11 @@ export type AssetFaceResponseDto = {
     /** Image width in pixels */
     imageWidth: number;
     person: (PersonResponseDto) | null;
+    /** Source video asset for temporal face detections */
+    sourceAssetId?: string | null;
     sourceType?: SourceType;
+    /** Representative frame seek time in milliseconds */
+    timestampMs?: number | null;
 };
 export type AssetFaceCreateDto = {
     /** Asset ID */
@@ -1757,6 +1820,7 @@ export type QueuesResponseLegacyDto = {
     smartSearch: QueueResponseLegacyDto;
     storageTemplateMigration: QueueResponseLegacyDto;
     thumbnailGeneration: QueueResponseLegacyDto;
+    transcription: QueueResponseLegacyDto;
     videoConversion: QueueResponseLegacyDto;
     workflow: QueueResponseLegacyDto;
 };
@@ -4876,6 +4940,67 @@ export function downloadAsset({ edited, id, key, slug }: {
         data: Blob;
     }>(`/assets/${encodeURIComponent(id)}/original${QS.query(QS.explode({
         edited,
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Delete asset subtitles
+ */
+export function deleteSubtitle({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/subtitles`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Retrieve asset subtitles
+ */
+export function getSubtitle({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetSubtitleResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/subtitles${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Generate subtitles for an asset
+ */
+export function requestSubtitle({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: AssetSubtitleGenerateResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/subtitles`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Retrieve the WebVTT subtitle track
+ */
+export function getSubtitleTrack({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: string;
+    }>(`/assets/${encodeURIComponent(id)}/subtitles.vtt${QS.query(QS.explode({
         key,
         slug
     }))}`, {
@@ -8174,6 +8299,7 @@ export enum QueueName {
     Notifications = "notifications",
     BackupDatabase = "backupDatabase",
     Ocr = "ocr",
+    Transcription = "transcription",
     Workflow = "workflow",
     IntegrityCheck = "integrityCheck",
     Editor = "editor"
@@ -8269,6 +8395,8 @@ export enum JobName {
     VersionCheck = "VersionCheck",
     OcrQueueAll = "OcrQueueAll",
     Ocr = "Ocr",
+    TranscriptionQueueAll = "TranscriptionQueueAll",
+    AssetTranscription = "AssetTranscription",
     WorkflowAssetTrigger = "WorkflowAssetTrigger",
     IntegrityUntrackedFilesQueueAll = "IntegrityUntrackedFilesQueueAll",
     IntegrityUntrackedFiles = "IntegrityUntrackedFiles",

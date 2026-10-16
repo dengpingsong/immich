@@ -1,6 +1,7 @@
 <script lang="ts">
   import FaceEditor from '$lib/components/asset-viewer/face-editor/FaceEditor.svelte';
   import VideoRemoteViewer from '$lib/components/asset-viewer/VideoRemoteViewer.svelte';
+  import VideoFaceTimeline from '$lib/components/asset-viewer/VideoFaceTimeline.svelte';
   import { assetViewerFadeDuration } from '$lib/constants';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { castManager } from '$lib/managers/cast-manager.svelte';
@@ -9,7 +10,9 @@
   import { mediaCapabilitiesManager } from '$lib/managers/media-capabilities-manager.svelte';
   import { autoPlayVideo, lang, loopVideo as loopVideoPreference } from '$lib/stores/preferences.store';
   import { getAssetHlsSessionUrl, getAssetHlsUrl, getAssetMediaUrl, getAssetPlaybackUrl } from '$lib/utils';
-  import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
+  import { getSubtitleLabel, getSubtitleTrackUrl, hasPlayableSubtitles } from '$lib/utils/subtitles';
+  import { serializeFaceSampleMarkers } from '$lib/utils/video-face';
+  import { AssetMediaSize, getSubtitle, type AssetResponseDto, type AssetSubtitleResponseDto } from '@immich/sdk';
   import { Icon, LoadingSpinner, shortcuts } from '@immich/ui';
   import {
     mdiCheck,
@@ -76,6 +79,9 @@
 
   let videoPlayer: HTMLVideoElement | undefined = $state();
   let isLoading = $state(true);
+  let subtitle = $state<AssetSubtitleResponseDto>();
+  // Subtitles are opt-in per video: a viewer should never have captions appear unrequested.
+  let subtitlesEnabled = $state(false);
   let hasLoadedMetadata = $state(false);
   let assetFileUrl = $derived.by(() => {
     if (featureFlagsManager.value.realtimeTranscoding) {
@@ -241,6 +247,42 @@
   });
 
   $effect(() => {
+    const id = asset.id;
+    subtitle = undefined;
+    subtitlesEnabled = false;
+    void getSubtitle({ ...authManager.params, id })
+      .then((data) => {
+        if (id === asset.id) {
+          subtitle = data;
+        }
+      })
+      .catch(() => {
+        /* Subtitles are optional: a missing or forbidden transcript must not affect playback. */
+      });
+  });
+
+  $effect(() => {
+    const video = videoPlayer;
+    if (!video || !(video instanceof HTMLVideoElement)) {
+      return;
+    }
+    for (const track of video.querySelectorAll('track[data-immich-subtitles]')) {
+      track.remove();
+    }
+    if (!subtitlesEnabled || !subtitle || !hasPlayableSubtitles(subtitle)) {
+      return;
+    }
+    const track = document.createElement('track');
+    track.dataset.immichSubtitles = '';
+    track.kind = 'subtitles';
+    track.label = getSubtitleLabel(subtitle);
+    track.srclang = subtitle.language || 'und';
+    track.src = getSubtitleTrackUrl(asset.id, authManager.params);
+    track.default = true;
+    video.append(track);
+  });
+
+  $effect(() => {
     // reactive on `assetFileUrl` changes
     hasLoadedMetadata = false;
     if (videoPlayer && assetFileUrl) {
@@ -317,6 +359,26 @@
 
   let containerWidth = $state(0);
   let containerHeight = $state(0);
+  let mediaController = $state<HTMLElement>();
+
+  // media-chrome hides its chrome after a couple of seconds of pointer inactivity while playing.
+  // Hovering a portrait means the pointer is outside the player, so the native seek range - and with it
+  // the detection marks - used to vanish exactly when the user asked to inspect a person. Keep the
+  // chrome visible for as long as a highlighted person's samples are being shown, then restore the
+  // default (media-chrome's own default is 2 seconds).
+  const DEFAULT_AUTOHIDE = '2';
+  $effect(() => {
+    const controller = mediaController;
+    if (!controller) {
+      return;
+    }
+    if (assetViewerManager.faceSampleMarkers.length > 0) {
+      controller.setAttribute('autohide', '-1');
+      controller.removeAttribute('userinactive');
+    } else {
+      controller.setAttribute('autohide', DEFAULT_AUTOHIDE);
+    }
+  });
 
   $effect(() => {
     if (assetViewerManager.isFaceEditMode) {
@@ -353,7 +415,7 @@
 {#if showVideo}
   <div
     transition:fade={{ duration: assetViewerFadeDuration }}
-    class="flex h-full place-content-center place-items-center select-none"
+    class="relative flex h-full place-content-center place-items-center select-none"
     bind:clientWidth={containerWidth}
     bind:clientHeight={containerHeight}
   >
@@ -372,6 +434,7 @@
         dir="ltr"
         lang={$lang}
         nohotkeys
+        bind:this={mediaController}
         class="dark h-full max-w-full"
         style:aspect-ratio={aspectRatio}
         defaultduration={asset.duration! / 1000}
@@ -483,9 +546,35 @@
               <media-settings-menu-button class="shrink-0 rounded-full p-2 outline-none"></media-settings-menu-button>
             {/if}
           </media-control-bar>
-          <immich-time-range class="h-8 w-full rounded-lg px-2 pb-3 outline-none"></immich-time-range>
+          <immich-time-range
+            class="h-8 w-full rounded-lg px-2 pb-3 outline-none"
+            face-markers={serializeFaceSampleMarkers(assetViewerManager.faceSampleMarkers)}
+            face-markers-label={$t('video_face_sample_markers')}
+          ></immich-time-range>
         </div>
       </media-controller>
+
+      {#if subtitle && hasPlayableSubtitles(subtitle)}
+        <button
+          type="button"
+          class="absolute inset-e-4 bottom-28 z-10 cursor-pointer rounded-sm bg-black/75 px-2 py-1 text-xs text-white focus-visible:outline"
+          aria-pressed={subtitlesEnabled}
+          data-subtitle-toggle
+          onclick={() => (subtitlesEnabled = !subtitlesEnabled)}
+        >
+          {$t('video_transcription_button')} · {getSubtitleLabel(subtitle)}
+        </button>
+      {/if}
+
+      {#if videoPlayer && !authManager.isSharedLink && authManager.authenticated && !assetViewerManager.isFaceEditMode}
+        <!-- Outside the media-chrome `centered-chrome` slot on purpose: that slot fades together with
+             the player controls, so hovering a portrait in the detail panel (pointer outside the
+             player) used to hide the entire face overlay. This layer stays mounted while the video
+             plays, and only draws boxes for frames that were actually sampled. -->
+        <div class="pointer-events-none absolute inset-0">
+          <VideoFaceTimeline assetId={asset.id} sourceAssetId={assetId} player={videoPlayer} />
+        </div>
+      {/if}
 
       {#if isLoading}
         <div class="absolute flex place-content-center place-items-center">

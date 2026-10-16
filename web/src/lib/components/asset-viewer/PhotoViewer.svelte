@@ -50,12 +50,13 @@
     untrack(() => {
       assetViewerManager.resetZoomState();
       visibleImageReady = false;
-      assetViewerManager.clearHighlightedFaces();
+      // A selection belongs to one asset; the next one must not inherit the previous person.
+      assetViewerManager.clearSelectedFaces();
     });
   });
 
   onDestroy(() => {
-    assetViewerManager.clearHighlightedFaces();
+    assetViewerManager.clearSelectedFaces();
     assetViewerManager.hideHiddenPeople();
   });
 

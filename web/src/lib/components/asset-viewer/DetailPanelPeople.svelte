@@ -6,6 +6,7 @@
   import { faceManager } from '$lib/stores/face.svelte';
   import { locale } from '$lib/stores/preferences.store';
   import { getPeopleThumbnailUrl } from '$lib/utils';
+  import { formatFaceSampleTime, getFaceSampleTimes } from '$lib/utils/video-face';
   import { type AssetResponseDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
   import { mdiEye, mdiEyeOff, mdiPencil, mdiPlus } from '@mdi/js';
@@ -21,6 +22,7 @@
   const { asset, isOwner, previousRoute }: Props = $props();
 
   const people = $derived(Array.from(faceManager.people));
+
   const visiblePeople = $derived(
     people
       .filter((p) => assetViewerManager.isShowingHiddenPeople || !p.isHidden)
@@ -55,7 +57,97 @@
         return { formattedBirthDate, formattedAge, ...person };
       }),
   );
+
+  const facesOf = (personId: string | undefined) => (personId ? (faceManager.facesByPersonId.get(personId) ?? []) : []);
+
+  /**
+   * Hover and click are separate states in the viewer manager: hovering is transient and wins while it
+   * lasts, a selection sticks until something else is selected. Keeping them apart is what lets the photo
+   * viewer clear its hover highlight on pointer leave without wiping the portrait the user just clicked.
+   */
+  const hoverPerson = (personId: string | undefined) => {
+    const faces = facesOf(personId);
+    assetViewerManager.setHighlightedFaces(faces);
+    assetViewerManager.setFaceSampleMarkers(getFaceSampleTimes(faces));
+  };
+
+  const selectPerson = (personId: string | undefined) => {
+    selectedPersonId = personId;
+    const faces = facesOf(personId);
+    assetViewerManager.selectFaces(faces);
+    assetViewerManager.selectFaceSampleMarkers(getFaceSampleTimes(faces));
+  };
+
+  // A click selects a person the way hovering shows one, but the selection sticks. A second click on the
+  // already selected person opens their gallery instead of navigating on the first click.
+  let selectedPersonId = $state<string>();
+  let keyboardNavigation = $state(false);
+
+  const onPortraitClick = (event: MouseEvent, personId: string) => {
+    if (selectedPersonId === personId) {
+      // Second click: follow the link to the person's gallery.
+      return;
+    }
+    event.preventDefault();
+    selectPerson(personId);
+  };
+
+  $effect(() => {
+    // Selections are per asset, so switching asset starts from a clean slate.
+    void asset.id;
+    selectPerson(undefined);
+  });
+
+  const onWindowKeyDown = () => (keyboardNavigation = true);
+  const onWindowPointerDown = () => (keyboardNavigation = false);
+
+  const onPortraitFocus = (personId: string) => {
+    // Tabbing to a portrait selects it, so the next Enter follows the link. Focus caused by a mouse press
+    // must not select it, otherwise the very first click would navigate again.
+    if (keyboardNavigation) {
+      selectPerson(personId);
+    }
+  };
+
+  // Tablets never fire `pointerleave` after a tap, so a highlight started by touch had no way back and
+  // the person (and their seek-range marks) stayed selected forever. Tapping anywhere outside the
+  // portraits now clears it; hovering with a mouse still behaves as before.
+  const onDocumentPointerDown = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse') {
+      return;
+    }
+    const target = event.target as Element | null;
+    if (target?.closest('[data-face-portrait]')) {
+      return;
+    }
+    selectPerson(undefined);
+  };
+
+  // Hovering a portrait must always produce visible feedback, even when the asset is showing the still
+  // photo and the person was only detected in the video: those boxes belong to another frame, so the
+  // viewer cannot draw them here and used to look unresponsive.
+  const hoveredPersonHint = $derived.by(() => {
+    const person = visiblePeople.find((candidate) =>
+      (faceManager.facesByPersonId.get(candidate.id) ?? []).some((face) =>
+        assetViewerManager.highlightedFaces.some((selected) => selected.id === face.id),
+      ),
+    );
+    if (!person) {
+      return undefined;
+    }
+    const faces = faceManager.facesByPersonId.get(person.id) ?? [];
+    const samples = getFaceSampleTimes(faces);
+    if (samples.length === 0) {
+      return $t('video_face_portrait_still_only');
+    }
+    return $t('video_face_portrait_video_samples', {
+      values: { samples: samples.map((timestamp) => formatFaceSampleTime(timestamp)).join(' · ') },
+    });
+  });
 </script>
+
+<svelte:document onpointerdown={onDocumentPointerDown} />
+<svelte:window onkeydown={onWindowKeyDown} onpointerdown={onWindowPointerDown} />
 
 {#if !authManager.isSharedLink}
   <section class="px-4 pt-4 text-sm">
@@ -108,10 +200,18 @@
         <a
           class="group outline-none"
           href={Route.viewPerson(person, { previousRoute })}
-          onfocus={() => assetViewerManager.setHighlightedFaces(personFaces)}
-          onblur={() => assetViewerManager.clearHighlightedFaces()}
-          onpointerenter={() => assetViewerManager.setHighlightedFaces(personFaces)}
-          onpointerleave={() => assetViewerManager.clearHighlightedFaces()}
+          data-face-portrait
+          data-selected={selectedPersonId === person.id ? 'true' : undefined}
+          class:ring-2={selectedPersonId === person.id}
+          onfocus={() => onPortraitFocus(person.id)}
+          onblur={() => hoverPerson(undefined)}
+          onpointerenter={(event) => {
+            if (event.pointerType === 'mouse') {
+              hoverPerson(person.id);
+            }
+          }}
+          onpointerleave={() => hoverPerson(undefined)}
+          onclick={(event) => onPortraitClick(event, person.id)}
         >
           <ImageThumbnail
             curve
@@ -133,5 +233,8 @@
         </a>
       {/each}
     </div>
+    {#if hoveredPersonHint}
+      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" data-face-hover-hint>{hoveredPersonHint}</p>
+    {/if}
   </section>
 {/if}

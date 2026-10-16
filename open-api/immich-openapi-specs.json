@@ -5023,6 +5023,255 @@
         "x-immich-state": "Stable"
       }
     },
+    "/assets/{id}/subtitles": {
+      "delete": {
+        "description": "Delete the generated subtitles of a video or the video part of a Live Photo.",
+        "operationId": "deleteSubtitle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete asset subtitles",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v3.2.4",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.update",
+        "x-immich-state": "Beta"
+      },
+      "get": {
+        "description": "Retrieve generated subtitle metadata for a video or the video part of a Live Photo.",
+        "operationId": "getSubtitle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetSubtitleResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve asset subtitles",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v3.2.4",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.read",
+        "x-immich-state": "Beta"
+      },
+      "post": {
+        "description": "Queue subtitle generation for a video or the video part of a Live Photo.",
+        "operationId": "requestSubtitle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetSubtitleGenerateResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Generate subtitles for an asset",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v3.2.4",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.update",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/assets/{id}/subtitles.vtt": {
+      "get": {
+        "description": "Retrieve the generated WebVTT track so a player can attach it to the video.",
+        "operationId": "getSubtitleTrack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve the WebVTT subtitle track",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v3.2.4",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/{id}/thumbnail": {
       "get": {
         "description": "Retrieve the thumbnail image for the specified asset. Viewing the fullsize thumbnail might redirect to downloadAsset, which requires a different permission.",
@@ -18638,6 +18887,9 @@
           "modelName": {
             "description": "Name of the model to use",
             "type": "string"
+          },
+          "videoFaces": {
+            "$ref": "#/components/schemas/AdminConfigVideoFacesDto"
           }
         },
         "required": [
@@ -18645,7 +18897,8 @@
           "maxDistance",
           "minFaces",
           "minScore",
-          "modelName"
+          "modelName",
+          "videoFaces"
         ],
         "type": "object"
       },
@@ -18845,6 +19098,9 @@
           "thumbnailGeneration": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
+          "transcription": {
+            "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
+          },
           "videoConversion": {
             "$ref": "#/components/schemas/AdminConfigJobSettingsDto"
           },
@@ -18866,6 +19122,7 @@
           "sidecar",
           "smartSearch",
           "thumbnailGeneration",
+          "transcription",
           "videoConversion",
           "workflow"
         ],
@@ -18990,6 +19247,9 @@
           "ocr": {
             "$ref": "#/components/schemas/AdminConfigOcrDto"
           },
+          "transcription": {
+            "$ref": "#/components/schemas/AdminConfigTranscriptionDto"
+          },
           "urls": {
             "description": "ML service URLs",
             "items": {
@@ -19006,6 +19266,7 @@
           "enabled",
           "facialRecognition",
           "ocr",
+          "transcription",
           "urls"
         ],
         "type": "object"
@@ -19449,6 +19710,53 @@
         ],
         "type": "object"
       },
+      "AdminConfigTranscriptionDto": {
+        "properties": {
+          "apiKey": {
+            "description": "Shared secret sent to the transcription worker",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enable automatic video subtitles via a Whisper-compatible transcription worker",
+            "type": "boolean"
+          },
+          "language": {
+            "description": "Optional source language hint (empty = detect the original language per chunk)",
+            "type": "string"
+          },
+          "maxChunkMs": {
+            "description": "Audio window sent to the worker per request, in milliseconds",
+            "maximum": 32000,
+            "minimum": 5000,
+            "type": "integer"
+          },
+          "modelName": {
+            "description": "Transcription model label reported by the worker",
+            "type": "string"
+          },
+          "noSpeechThreshold": {
+            "description": "Discard cues whose no-speech probability is at least this value",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "url": {
+            "description": "Transcription worker URL (internal, never exposed to browsers)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "apiKey",
+          "enabled",
+          "language",
+          "maxChunkMs",
+          "modelName",
+          "noSpeechThreshold",
+          "url"
+        ],
+        "type": "object"
+      },
       "AdminConfigTrashDto": {
         "properties": {
           "days": {
@@ -19479,6 +19787,47 @@
         },
         "required": [
           "deleteDelay"
+        ],
+        "type": "object"
+      },
+      "AdminConfigVideoFacesDto": {
+        "properties": {
+          "enabled": {
+            "description": "Enable multi-frame video and Live Photo face detection",
+            "type": "boolean"
+          },
+          "intervalMs": {
+            "description": "Video sampling interval in milliseconds",
+            "maximum": 60000,
+            "minimum": 100,
+            "type": "integer"
+          },
+          "livePhotoIntervalMs": {
+            "description": "Live Photo sampling interval in milliseconds",
+            "maximum": 10000,
+            "minimum": 100,
+            "type": "integer"
+          },
+          "maxFrames": {
+            "description": "Optional maximum sampled frames per video; 0 means unlimited",
+            "maximum": 300,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "minSimilarity": {
+            "description": "Minimum cosine similarity for within-asset face deduplication",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "enabled",
+          "intervalMs",
+          "livePhotoIntervalMs",
+          "maxFrames",
+          "minSimilarity"
         ],
         "type": "object"
       },
@@ -20309,6 +20658,12 @@
       "AssetFaceResponseDto": {
         "description": "Asset face with person",
         "properties": {
+          "appearances": {
+            "items": {
+              "$ref": "#/components/schemas/FaceAppearanceDto"
+            },
+            "type": "array"
+          },
           "boundingBoxX1": {
             "description": "Bounding box X1 coordinate",
             "maximum": 9007199254740991,
@@ -20359,8 +20714,22 @@
             ],
             "nullable": true
           },
+          "sourceAssetId": {
+            "description": "Source video asset for temporal face detections",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
           "sourceType": {
             "$ref": "#/components/schemas/SourceType"
+          },
+          "timestampMs": {
+            "description": "Representative frame seek time in milliseconds",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "nullable": true,
+            "type": "integer"
           }
         },
         "required": [
@@ -21202,6 +21571,62 @@
           "images",
           "total",
           "videos"
+        ],
+        "type": "object"
+      },
+      "AssetSubtitleGenerateResponseDto": {
+        "properties": {
+          "queued": {
+            "description": "Whether a transcription job was queued",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "queued"
+        ],
+        "type": "object"
+      },
+      "AssetSubtitleResponseDto": {
+        "properties": {
+          "assetId": {
+            "description": "Asset this transcript belongs to",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "cueCount": {
+            "description": "Number of subtitle cues",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "droppedCueCount": {
+            "description": "Cues discarded because the model reported silence",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "language": {
+            "description": "Detected or configured language of the transcript",
+            "type": "string"
+          },
+          "modelName": {
+            "description": "Model that produced the transcript",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "When the transcript was last generated",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "cueCount",
+          "droppedCueCount",
+          "language",
+          "modelName",
+          "updatedAt"
         ],
         "type": "object"
       },
@@ -22300,6 +22725,57 @@
         },
         "type": "object"
       },
+      "FaceAppearanceDto": {
+        "properties": {
+          "boundingBoxX1": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "boundingBoxX2": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "boundingBoxY1": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "boundingBoxY2": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "imageHeight": {
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "imageWidth": {
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "timestampMs": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "boundingBoxX1",
+          "boundingBoxX2",
+          "boundingBoxY1",
+          "boundingBoxY2",
+          "imageHeight",
+          "imageWidth",
+          "timestampMs"
+        ],
+        "type": "object"
+      },
       "FaceDto": {
         "properties": {
           "id": {
@@ -22567,6 +23043,8 @@
           "VersionCheck",
           "OcrQueueAll",
           "Ocr",
+          "TranscriptionQueueAll",
+          "AssetTranscription",
           "WorkflowAssetTrigger",
           "IntegrityUntrackedFilesQueueAll",
           "IntegrityUntrackedFiles",
@@ -25595,6 +26073,7 @@
           "notifications",
           "backupDatabase",
           "ocr",
+          "transcription",
           "workflow",
           "integrityCheck",
           "editor"
@@ -25764,6 +26243,9 @@
           "thumbnailGeneration": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
+          "transcription": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "videoConversion": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -25789,6 +26271,7 @@
           "smartSearch",
           "storageTemplateMigration",
           "thumbnailGeneration",
+          "transcription",
           "videoConversion",
           "workflow"
         ],

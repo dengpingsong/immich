@@ -47,6 +47,7 @@
     [QueueName.Notifications]: $t('notifications'),
     [QueueName.BackupDatabase]: $t('admin.backup_database'),
     [QueueName.Ocr]: $t('admin.machine_learning_ocr'),
+    [QueueName.Transcription]: $t('video_transcription_enabled'),
     [QueueName.Workflow]: $t('workflows'),
     [QueueName.Editor]: $t('editor'),
     [QueueName.IntegrityCheck]: $t('integrity_checks'),
