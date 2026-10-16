@@ -1,0 +1,50 @@
+# Separate, opt-in worker for the Whisper-family transcription backend.
+#
+# It is deliberately NOT part of the vision image:
+#   * the vision image must keep working when the optional Whisper dependency is absent;
+#   * native ASR inference cannot be reliably cancelled through an HTTP timeout, so it runs in its own
+#     process that can be killed and restarted without touching face/CLIP inference;
+#   * a crash, memory spike, or missing model in ASR cannot take down the vision worker.
+#
+# Only the modules the transcription worker imports are installed here, so the image stays small.
+FROM python:3.11-slim-bookworm AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TRANSFORMERS_CACHE=/cache \
+    HF_HOME=/cache/hf-cache
+
+WORKDIR /usr/src
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends tini libgomp1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Web layer plus the optional ASR backend. faster-whisper pulls ctranslate2/tokenizers/huggingface-hub,
+# which are the only heavyweight dependencies here; the ONNX vision stack is intentionally absent.
+RUN pip install --no-cache-dir \
+    "fastapi>=0.95.2,<1.0" \
+    "uvicorn[standard]>=0.22.0,<1.0" \
+    "pydantic>=2.0.0,<3" \
+    "pydantic-settings>=2.5.2,<3" \
+    "python-multipart>=0.0.6,<1.0" \
+    "faster-whisper>=1.1.0,<2"
+
+COPY immich_ml immich_ml
+
+# Models are mounted read-only; nothing is downloaded implicitly at request time.
+VOLUME /cache
+EXPOSE 3004
+
+ENTRYPOINT ["tini", "--"]
+CMD ["python", "-m", "uvicorn", "immich_ml.transcription.main:app", "--host", "0.0.0.0", "--port", "3004"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+    CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:3004/health',timeout=4)"
+
+# Test stage: unit tests use a stub backend, so no model and no download are required.
+FROM base AS test
+
+RUN pip install --no-cache-dir "pytest>=7.3.1" "httpx>=0.24.1"
+CMD ["python", "-m", "pytest", "-q", "test_transcription.py"]
